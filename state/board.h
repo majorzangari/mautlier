@@ -26,4 +26,6 @@ typedef struct {
   uint8_t halfmove_clock;
 } Board;
 
+const char *board_to_string(Board *board);
+
 #endif // BOARD_H

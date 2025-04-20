@@ -27,7 +27,6 @@ void populate_pieces(uint64_t pieces[2][6], char *pieces_data) {
       uint64_t square_bit = 1ULL << index;
       // clang-format off
 
-      printf("[%c, %d, %d, %ld]", piece, rank, file, square_bit);
       switch (piece) {
         case 'P': pieces[0][0] |= square_bit; break;
         case 'N': pieces[0][1] |= square_bit; break;
