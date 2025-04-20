@@ -21,8 +21,6 @@ bool board_valid(Board *board) {
   return true;
 }
 
-#define BOARD_SIDE "+---+---+---+---+---+---+---+---+"
-
 char piece_char_at(Board *board, int rank, int file) {
   uint64_t square_bit = 1ULL << (rank * 8 + file);
 
@@ -43,6 +41,9 @@ char piece_char_at(Board *board, int rank, int file) {
   return ' ';
 }
 
+#define BOARD_SIDE "+---+---+---+---+---+---+---+---+"
+#define FILE_LABELS "  a   b   c   d   e   f   g   h  "
+
 const char *board_to_string(Board *board) {
   if (!board_valid(board)) {
     return "Invalid Board";
@@ -61,8 +62,10 @@ const char *board_to_string(Board *board) {
     }
 
     buffer_ptr += snprintf(buffer_ptr, buffer_size - (buffer_ptr - buffer),
-                           "|\n%s\n", BOARD_SIDE);
+                           "| %d\n%s\n", rank + 1, BOARD_SIDE);
   }
+  buffer_ptr += snprintf(buffer_ptr, buffer_size - (buffer_ptr - buffer),
+                         "%s\n", FILE_LABELS);
   *buffer_ptr = '\0';
 
   return buffer;
