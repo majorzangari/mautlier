@@ -21,6 +21,23 @@ bool board_valid(Board *board) {
   return true;
 }
 
+void board_update_occupied(Board *board) {
+  board->occupied_by_color[WHITE] = 0;
+  board->occupied_by_color[BLACK] = 0;
+  for (int color = 0; color < 2; color++) {
+    for (int piece = 0; piece < 6; piece++) {
+      if (color == WHITE) {
+        board->occupied_by_color[WHITE] |= board->pieces[color][piece];
+      } else {
+        board->occupied_by_color[BLACK] |= board->pieces[color][piece];
+      }
+    }
+  }
+
+  board->occupied =
+      board->occupied_by_color[WHITE] | board->occupied_by_color[BLACK];
+}
+
 char piece_char_at(Board *board, int rank, int file) {
   uint64_t square_bit = 1ULL << (rank * 8 + file);
 
@@ -48,7 +65,7 @@ const char *board_to_string(Board *board) {
   if (!board_valid(board)) {
     return "Invalid Board";
   }
-  size_t buffer_size = 600;
+  size_t buffer_size = 650;
   char *buffer = malloc(buffer_size);
   char *buffer_ptr = buffer;
 

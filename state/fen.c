@@ -8,6 +8,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "board.h"
 #include "stdio.h"
 
 void populate_pieces(uint64_t pieces[2][6], char *pieces_data) {
@@ -28,19 +29,19 @@ void populate_pieces(uint64_t pieces[2][6], char *pieces_data) {
       // clang-format off
 
       switch (piece) {
-        case 'P': pieces[0][0] |= square_bit; break;
-        case 'N': pieces[0][1] |= square_bit; break;
-        case 'B': pieces[0][2] |= square_bit; break;
-        case 'R': pieces[0][3] |= square_bit; break;
-        case 'Q': pieces[0][4] |= square_bit; break;
-        case 'K': pieces[0][5] |= square_bit; break;
+        case 'P': pieces[WHITE][0] |= square_bit; break;
+        case 'N': pieces[WHITE][1] |= square_bit; break;
+        case 'B': pieces[WHITE][2] |= square_bit; break;
+        case 'R': pieces[WHITE][3] |= square_bit; break;
+        case 'Q': pieces[WHITE][4] |= square_bit; break;
+        case 'K': pieces[WHITE][5] |= square_bit; break;
 
-        case 'p': pieces[1][0] |= square_bit; break;
-        case 'n': pieces[1][1] |= square_bit; break;
-        case 'b': pieces[1][2] |= square_bit; break;
-        case 'r': pieces[1][3] |= square_bit; break;
-        case 'q': pieces[1][4] |= square_bit; break;
-        case 'k': pieces[1][5] |= square_bit; break;
+        case 'p': pieces[BLACK][0] |= square_bit; break;
+        case 'n': pieces[BLACK][1] |= square_bit; break;
+        case 'b': pieces[BLACK][2] |= square_bit; break;
+        case 'r': pieces[BLACK][3] |= square_bit; break;
+        case 'q': pieces[BLACK][4] |= square_bit; break;
+        case 'k': pieces[BLACK][5] |= square_bit; break;
         default: break;
       }
       // clang-format on
@@ -49,12 +50,12 @@ void populate_pieces(uint64_t pieces[2][6], char *pieces_data) {
   }
 }
 
-uint64_t square_to_bit(const char *square) {
+Bitboard square_to_bit(const char *square) {
   if (strlen(square) != 2) {
     return 0;
   }
 
-  uint64_t out = 1;
+  Bitboard out = 1;
 
   // clang-format off
   switch (*square) {
@@ -107,6 +108,7 @@ Board *fen_to_board(char *fen) {
 
   char *pieces_data = strtok_r(fen, " ", &saveptr);
   populate_pieces(out->pieces, pieces_data);
+  board_update_occupied(out);
 
   char *to_move_data = strtok_r(NULL, " ", &saveptr);
 
