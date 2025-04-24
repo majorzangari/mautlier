@@ -3,6 +3,7 @@
 //
 
 #include "board.h"
+#include "fen.h"
 
 #include <stdbool.h>
 #include <stdio.h>
@@ -38,6 +39,14 @@ void board_update_occupied(Board *board) {
       board->occupied_by_color[WHITE] | board->occupied_by_color[BLACK];
 }
 
+char *square_to_string(int index) {
+  char *out = malloc(3);
+  out[0] = 'a' + (index % 8);
+  out[1] = '1' + (index / 8);
+  out[2] = '\0';
+  return out;
+}
+
 char piece_char_at(Board *board, int rank, int file) {
   uint64_t square_bit = 1ULL << (rank * 8 + file);
 
@@ -61,11 +70,12 @@ char piece_char_at(Board *board, int rank, int file) {
 #define BOARD_SIDE "+---+---+---+---+---+---+---+---+"
 #define FILE_LABELS "  a   b   c   d   e   f   g   h  "
 
-const char *board_to_string(Board *board) {
+// Board output format stolen from stockfish (mine was ugly)
+char *board_to_string(Board *board) {
   if (!board_valid(board)) {
     return "Invalid Board";
   }
-  size_t buffer_size = 650;
+  size_t buffer_size = 750;
   char *buffer = malloc(buffer_size);
   char *buffer_ptr = buffer;
 
@@ -83,6 +93,11 @@ const char *board_to_string(Board *board) {
   }
   buffer_ptr += snprintf(buffer_ptr, buffer_size - (buffer_ptr - buffer),
                          "%s\n", FILE_LABELS);
+
+  char *board_fen = board_to_fen(board);
+  buffer_ptr += snprintf(buffer_ptr, buffer_size - (buffer_ptr - buffer),
+                         "\nFen: %s", board_fen);
+  free(board_fen);
   *buffer_ptr = '\0';
 
   return buffer;

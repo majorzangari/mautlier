@@ -6,11 +6,6 @@
 #include "board.h"
 #include "constants.h"
 
-#include <stdio.h>
-
-#define lsb_index(bb) (__builtin_ctzll(bb))
-#define pop_lsb(bb) ((bb) &= (bb) - 1)
-
 Move encode_move(int from_square, int to_square, int flags) {
   return (from_square << 10) | (to_square << 4) | flags;
 } // TODO should probably inline this (or macro? idk)
@@ -52,6 +47,7 @@ int generate_pawn_pushes(Bitboard pawns, Bitboard occupied, Move *moves,
   return num_moves;
 }
 
+// TODO: en passant
 int generate_pawn_captures(Bitboard pawns, Bitboard enemy_occupied, Move *moves,
                            ToMove color) {
   int num_moves = 0;

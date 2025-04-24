@@ -60,6 +60,7 @@ typedef struct {
 
 void board_update_occupied(Board *board);
 
-const char *board_to_string(Board *board);
+char *square_to_string(int index);
+char *board_to_string(Board *board);
 
 #endif // BOARD_H

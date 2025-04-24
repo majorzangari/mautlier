@@ -9,6 +9,7 @@
 #include <string.h>
 
 #include "board.h"
+#include "move.h" // TODO yucky yucky move these functions somewhere else
 #include "stdio.h"
 
 void populate_pieces(uint64_t pieces[2][6], char *pieces_data) {
@@ -130,5 +131,72 @@ Board *fen_to_board(char *fen) {
   char *halfmove_clock_data = strtok_r(NULL, " ", &saveptr);
   out->halfmove_clock = atoi(halfmove_clock_data);
 
+  return out;
+}
+
+char *board_to_fen(Board *board) {
+  size_t buffer_size = 95;
+  char *out = malloc(buffer_size);
+  int index = 0;
+
+  for (int rank = 7; rank >= 0; rank--) {
+    for (int file = 7; file >= 0; file--) {
+      int square_index = rank * 8 + file;
+      Bitboard square_bit = 1ULL << square_index;
+      // clang-format off
+      if      ((board->pieces[WHITE][PAWN] & square_bit) > 0) out[index++] = 'P';
+      else if ((board->pieces[WHITE][KNIGHT] & square_bit) > 0) out[index++] = 'N';
+      else if ((board->pieces[WHITE][BISHOP] & square_bit) > 0) out[index++] = 'B';
+      else if ((board->pieces[WHITE][ROOK] & square_bit) > 0) out[index++] = 'R';
+      else if ((board->pieces[WHITE][QUEEN] & square_bit) > 0) out[index++] = 'Q';
+      else if ((board->pieces[WHITE][KING] & square_bit) > 0) out[index++] = 'K';
+
+      else if ((board->pieces[BLACK][PAWN] & square_bit) > 0) out[index++] = 'p';
+      else if ((board->pieces[BLACK][KNIGHT] & square_bit) > 0) out[index++] = 'n';
+      else if ((board->pieces[BLACK][BISHOP] & square_bit) > 0) out[index++] = 'b';
+      else if ((board->pieces[BLACK][ROOK] & square_bit) > 0) out[index++] = 'r';
+      else if ((board->pieces[BLACK][QUEEN] & square_bit) > 0) out[index++] = 'q';
+      else if ((board->pieces[BLACK][KING] & square_bit) > 0) out[index++] = 'k';
+      // clang-format on
+      else {
+        int empty_squares = 1;
+        while (file > 0 && (board->occupied & square_bit) == 0) {
+          empty_squares++;
+          file--;
+        }
+        index +=
+            snprintf(out + index, buffer_size - index, "%d", empty_squares);
+      }
+    }
+    if (rank != 0)
+      out[index++] = '/';
+  }
+
+  out[index++] = ' ';
+  out[index++] = (board->to_move == WHITE_TO_MOVE) ? 'w' : 'b';
+  out[index++] = ' ';
+
+  // clang-format off
+  if ((board->castling_rights | CR_WHITE_SHORT) > 0) out[index++] = 'K';
+  if ((board->castling_rights | CR_BLACK_SHORT) > 0) out[index++] = 'k';
+  if ((board->castling_rights | CR_WHITE_LONG) > 0) out[index++] = 'Q';
+  if ((board->castling_rights | CR_BLACK_LONG) > 0) out[index++] = 'q';
+  // clang-format on
+
+  out[index++] = ' ';
+  if (board->en_passant == 0)
+    out[index++] = '-';
+  else {
+    int ep_index = lsb_index(board->en_passant);
+    char *square_str = square_to_string(ep_index);
+    strcpy(out + index, square_to_string(ep_index));
+    free(square_str);
+    index += 2;
+  }
+
+  index += snprintf(
+      out + index, buffer_size - index, " %d %d", board->halfmove_clock,
+      0); // TODO: actually write a real fullmove clock if I end up storing it
+  out[index] = '\0';
   return out;
 }

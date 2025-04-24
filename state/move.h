@@ -9,6 +9,9 @@
 
 #define MAX_MOVES 256
 
+#define lsb_index(bb) (__builtin_ctzll(bb))
+#define pop_lsb(bb) ((bb) &= (bb) - 1)
+
 typedef uint16_t Move;
 
 int generate_moves(Board *board, Move moves[MAX_MOVES]);
