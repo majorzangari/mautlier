@@ -7,4 +7,6 @@ add_executable(mautlier main.c
         state/board.h
         state/board.c
         state/fen.h
-        state/fen.c)
+        state/fen.c
+        state/move.h
+        state/move.c)
