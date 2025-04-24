@@ -80,6 +80,38 @@ int generate_pawn_captures(Bitboard pawns, Bitboard enemy_occupied, Move *moves,
   return num_moves;
 }
 
+int generate_en_passant(Bitboard pawns, Bitboard ep, ToMove color,
+                        Move *moves) {
+  if (!ep)
+    return 0;
+
+  int num_moves = 0;
+  int ep_square = lsb_index(ep);
+
+  Bitboard attackers;
+  if (color == WHITE) {
+    Bitboard r5_pawns = pawns & RANK_5;
+    Bitboard right_attackers = (ep >> 7) & r5_pawns & ~FILE_A;
+    Bitboard left_attackers = (ep >> 9) & r5_pawns & ~FILE_H;
+    attackers = left_attackers | right_attackers;
+  } else {
+    Bitboard r4_pawns = pawns & RANK_4;
+    Bitboard right_attackers = (ep << 9) & r4_pawns & ~FILE_H;
+    Bitboard left_attackers = (ep << 7) & r4_pawns & ~FILE_A;
+    attackers = left_attackers | right_attackers;
+  }
+
+  while (attackers) {
+    int from_sq = lsb_index(attackers);
+    *moves++ = encode_move(from_sq, ep_square,
+                           0); // TODO: add other flags CAPTURE
+    num_moves++;
+    pop_lsb(attackers);
+  }
+
+  return num_moves;
+}
+
 int generate_knight_moves(Bitboard knights, Bitboard same_side_occupied,
                           Move *moves) {
   int num_moves = 0;
@@ -116,6 +148,8 @@ int generate_moves(Board *board, Move moves[MAX_MOVES]) {
                                      board->to_move);
   move_count += generate_pawn_captures(pawns, enemy_side_occupied,
                                        moves + move_count, board->to_move);
+  move_count += generate_en_passant(pawns, board->en_passant, board->to_move,
+                                    moves + move_count);
   *(moves + move_count) = (uint16_t)0; // TEMP
   return move_count;
 }

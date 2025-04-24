@@ -5,7 +5,7 @@
 #include <stdio.h>
 
 int main(void) {
-  char str[] = "rnbqkbnr/pppppp2/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
+  char str[] = "rnbqkbnr/pppp1ppp/8/3Pp3/8/8/PPPBPPPP/RN1QKBNR w KQkq e6 0 4";
   Board *board = fen_to_board(str);
   printf("%s\n", board_to_string(board));
   Move moves[MAX_MOVES];
@@ -14,7 +14,7 @@ int main(void) {
     int from = moves[i] >> 10;
     int to = (moves[i] & 0x03FF) >> 4;
     int flags = (moves[i] & 0x000F);
-    // printf("Move %d: from %d to %d flags %d\n", i, from, to, flags);
+    printf("Move %d: from %d to %d flags %d\n", i, from, to, flags);
   }
   return 0;
 }
