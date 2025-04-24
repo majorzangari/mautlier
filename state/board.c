@@ -25,14 +25,11 @@ bool board_valid(Board *board) {
 void board_update_occupied(Board *board) {
   board->occupied_by_color[WHITE] = 0;
   board->occupied_by_color[BLACK] = 0;
-  for (int color = 0; color < 2; color++) {
-    for (int piece = 0; piece < 6; piece++) {
-      if (color == WHITE) {
-        board->occupied_by_color[WHITE] |= board->pieces[color][piece];
-      } else {
-        board->occupied_by_color[BLACK] |= board->pieces[color][piece];
-      }
-    }
+  board->occupied = 0;
+
+  for (int piece = 0; piece < 6; piece++) {
+    board->occupied_by_color[WHITE] |= board->pieces[WHITE][piece];
+    board->occupied_by_color[BLACK] |= board->pieces[BLACK][piece];
   }
 
   board->occupied =

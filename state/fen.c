@@ -14,16 +14,16 @@
 
 void populate_pieces(uint64_t pieces[2][6], char *pieces_data) {
   int rank = 7;
-  int file = 0;
+  int file = 7;
 
   for (char *c = pieces_data; *c != '\0' && rank >= 0; c++) {
     char piece = *c;
     if (piece == '/') {
       rank--;
-      file = 0;
+      file = 7;
     } else if (piece >= '1' && piece <= '8') {
       int empty_squares = piece - '0';
-      file += empty_squares;
+      file -= empty_squares;
     } else {
       int index = rank * 8 + file;
       uint64_t square_bit = 1ULL << index;
@@ -46,7 +46,7 @@ void populate_pieces(uint64_t pieces[2][6], char *pieces_data) {
         default: break;
       }
       // clang-format on
-      file++;
+      file--;
     }
   }
 }
@@ -159,9 +159,10 @@ char *board_to_fen(Board *board) {
       else if ((board->pieces[BLACK][KING] & square_bit) > 0) out[index++] = 'k';
       // clang-format on
       else {
-        int empty_squares = 1;
-        while (file > 0 && (board->occupied & square_bit) == 0) {
+        int empty_squares = 0;
+        while (file >= 0 && ((board->occupied & square_bit) == 0)) {
           empty_squares++;
+          square_bit >>= 1;
           file--;
         }
         index +=
