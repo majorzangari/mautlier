@@ -136,11 +136,34 @@ int generate_knight_moves(Bitboard knights, Bitboard same_side_occupied,
   return num_moves;
 }
 
+int generate_king_moves(Bitboard kings, Bitboard same_side_occupied,
+                        Move *moves) {
+  int num_moves = 0;
+
+  while (kings) {
+    int index = lsb_index(kings);
+    pop_lsb(kings);
+
+    Bitboard attacks = king_moves[index];
+    Bitboard pseudo_moves = attacks & ~same_side_occupied;
+
+    while (pseudo_moves) {
+      int to_square = lsb_index(pseudo_moves);
+      pop_lsb(pseudo_moves);
+      *moves++ = encode_move(index, to_square, 0); // TODO: add other flags
+      num_moves++;
+    }
+  }
+
+  return num_moves;
+}
+
 int generate_moves(Board *board, Move moves[MAX_MOVES]) {
   int move_count = 0;
 
   Bitboard pawns = board->pieces[board->to_move][PAWN];
   Bitboard knights = board->pieces[board->to_move][KNIGHT];
+  Bitboard kings = board->pieces[board->to_move][KING];
   Bitboard same_side_occupied = board->occupied_by_color[board->to_move];
   Bitboard enemy_side_occupied = board->occupied_by_color[1 - board->to_move];
   move_count += generate_knight_moves(knights, same_side_occupied, moves);
@@ -150,6 +173,8 @@ int generate_moves(Board *board, Move moves[MAX_MOVES]) {
                                        moves + move_count, board->to_move);
   move_count += generate_en_passant(pawns, board->en_passant, board->to_move,
                                     moves + move_count);
+  move_count +=
+      generate_king_moves(kings, same_side_occupied, moves + move_count);
   *(moves + move_count) = (uint16_t)0; // TEMP
   return move_count;
 }
