@@ -9,4 +9,6 @@ add_executable(mautlier main.c
         state/fen.h
         state/fen.c
         state/move.h
-        state/move.c)
+        state/move.c
+        state/constants.h
+        state/constants.c)
