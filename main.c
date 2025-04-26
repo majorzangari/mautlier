@@ -1,11 +1,14 @@
 #include "state/board.h"
+#include "state/constants.h"
 #include "state/fen.h"
 #include "state/move.h"
 
 #include <stdio.h>
 
 int main(void) {
-  char str[] = "rnbqkbnr/8/8/8/8/8/8/RNBQKBNR w KQkq - 0 1";
+  init_data();
+
+  char str[] = "rnbqkbnr/8/8/8/8/8/8/R222R w KQkq - 0 1";
   Board *board = fen_to_board(str);
   printf("%s\n", board_to_string(board));
   Move moves[MAX_MOVES];

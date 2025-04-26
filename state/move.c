@@ -6,9 +6,9 @@
 #include "board.h"
 #include "constants.h"
 
-Move encode_move(int from_square, int to_square, int flags) {
+static inline Move encode_move(int from_square, int to_square, int flags) {
   return (from_square << 10) | (to_square << 4) | flags;
-} // TODO should probably inline this (or macro? idk)
+}
 
 int generate_pawn_pushes(Bitboard pawns, Bitboard occupied, Move *moves,
                          ToMove color) {
@@ -47,7 +47,6 @@ int generate_pawn_pushes(Bitboard pawns, Bitboard occupied, Move *moves,
   return num_moves;
 }
 
-// TODO: en passant
 int generate_pawn_captures(Bitboard pawns, Bitboard enemy_occupied, Move *moves,
                            ToMove color) {
   int num_moves = 0;
@@ -139,7 +138,6 @@ int generate_knight_moves(Bitboard knights, Bitboard same_side_occupied,
 int generate_king_moves(Bitboard kings, Bitboard same_side_occupied,
                         Move *moves) {
   int num_moves = 0;
-
   while (kings) {
     int index = lsb_index(kings);
     pop_lsb(kings);
@@ -158,14 +156,38 @@ int generate_king_moves(Bitboard kings, Bitboard same_side_occupied,
   return num_moves;
 }
 
+int generate_rook_moves(Bitboard rooks, Bitboard occupied,
+                        Bitboard same_side_occupied, Move *moves) {
+  int num_moves = 0;
+
+  while (rooks) {
+    int index = lsb_index(rooks);
+    pop_lsb(rooks);
+    Bitboard rook_moves =
+        get_rook_attack_board(index, occupied, same_side_occupied);
+
+    while (rook_moves) {
+      int to_square = lsb_index(rook_moves);
+      pop_lsb(rook_moves);
+      *moves++ = encode_move(index, to_square, 0); // TODO: add other flags
+      num_moves++;
+    }
+  }
+
+  return num_moves;
+}
+
 int generate_moves(Board *board, Move moves[MAX_MOVES]) {
   int move_count = 0;
 
   Bitboard pawns = board->pieces[board->to_move][PAWN];
   Bitboard knights = board->pieces[board->to_move][KNIGHT];
+  Bitboard rooks = board->pieces[board->to_move][ROOK];
+  Bitboard queens = board->pieces[board->to_move][QUEEN];
   Bitboard kings = board->pieces[board->to_move][KING];
   Bitboard same_side_occupied = board->occupied_by_color[board->to_move];
   Bitboard enemy_side_occupied = board->occupied_by_color[1 - board->to_move];
+
   move_count += generate_knight_moves(knights, same_side_occupied, moves);
   move_count += generate_pawn_pushes(pawns, board->occupied, moves + move_count,
                                      board->to_move);
@@ -175,6 +197,9 @@ int generate_moves(Board *board, Move moves[MAX_MOVES]) {
                                     moves + move_count);
   move_count +=
       generate_king_moves(kings, same_side_occupied, moves + move_count);
+  move_count += generate_rook_moves(rooks | queens, board->occupied,
+                                    same_side_occupied, moves + move_count);
+
   *(moves + move_count) = (uint16_t)0; // TEMP
   return move_count;
 }
