@@ -177,11 +177,33 @@ int generate_rook_moves(Bitboard rooks, Bitboard occupied,
   return num_moves;
 }
 
+int generate_bishop_moves(Bitboard bishops, Bitboard occupied,
+                          Bitboard same_side_occupied, Move *moves) {
+  int num_moves = 0;
+
+  while (bishops) {
+    int index = lsb_index(bishops);
+    pop_lsb(bishops);
+    Bitboard bishop_moves =
+        get_bishop_attack_board(index, occupied, same_side_occupied);
+
+    while (bishop_moves) {
+      int to_square = lsb_index(bishop_moves);
+      pop_lsb(bishop_moves);
+      *moves++ = encode_move(index, to_square, 0); // TODO: add other flags
+      num_moves++;
+    }
+  }
+
+  return num_moves;
+}
+
 int generate_moves(Board *board, Move moves[MAX_MOVES]) {
   int move_count = 0;
 
   Bitboard pawns = board->pieces[board->to_move][PAWN];
   Bitboard knights = board->pieces[board->to_move][KNIGHT];
+  Bitboard bishops = board->pieces[board->to_move][BISHOP];
   Bitboard rooks = board->pieces[board->to_move][ROOK];
   Bitboard queens = board->pieces[board->to_move][QUEEN];
   Bitboard kings = board->pieces[board->to_move][KING];
@@ -199,6 +221,8 @@ int generate_moves(Board *board, Move moves[MAX_MOVES]) {
       generate_king_moves(kings, same_side_occupied, moves + move_count);
   move_count += generate_rook_moves(rooks | queens, board->occupied,
                                     same_side_occupied, moves + move_count);
+  move_count += generate_bishop_moves(bishops | queens, board->occupied,
+                                      same_side_occupied, moves + move_count);
 
   *(moves + move_count) = (uint16_t)0; // TEMP
   return move_count;

@@ -8,7 +8,7 @@
 int main(void) {
   init_data();
 
-  char str[] = "rnbqkbnr/8/8/8/8/8/8/R222R w KQkq - 0 1";
+  char str[] = "rnbqkbnr/8/8/8/4B3/8/8/8 w KQkq - 0 1";
   Board *board = fen_to_board(str);
   printf("%s\n", board_to_string(board));
   Move moves[MAX_MOVES];
