@@ -110,6 +110,7 @@ Board *fen_to_board(char *fen) {
   char *pieces_data = strtok_r(fen, " ", &saveptr);
   populate_pieces(out->pieces, pieces_data);
   board_update_occupied(out);
+  board_update_piece_table(out);
 
   char *to_move_data = strtok_r(NULL, " ", &saveptr);
 
@@ -121,15 +122,25 @@ Board *fen_to_board(char *fen) {
     free(out);
     return NULL;
   }
-
+  GameStateDetails details = {0};
   char *castling_rights_data = strtok_r(NULL, " ", &saveptr);
-  out->castling_rights = parse_castling_rights(castling_rights_data);
+  details.castling_rights = parse_castling_rights(castling_rights_data);
 
   char *en_passant_data = strtok_r(NULL, " ", &saveptr);
-  out->en_passant = square_to_bit(en_passant_data);
+  details.en_passant = square_to_bit(en_passant_data);
 
   char *halfmove_clock_data = strtok_r(NULL, " ", &saveptr);
-  out->halfmove_clock = atoi(halfmove_clock_data);
+  details.halfmove_clock = atoi(halfmove_clock_data);
+
+  details.captured_piece = PIECE_NONE;
+
+  out->castling_rights = details.castling_rights;
+  out->en_passant = details.en_passant;
+  out->halfmove_clock = details.halfmove_clock;
+  out->game_state = GS_ONGOING;
+
+  // GameStateDetailsStack_init(&out->game_state_details);
+  // GameStateDetailsStack_push(&out->game_state_details, details);
 
   return out;
 }

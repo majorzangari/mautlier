@@ -7,8 +7,13 @@
 
 #include <stdint.h>
 
+// from move.h
+typedef uint16_t Move;
+
 #define WHITE 0
 #define BLACK 1
+
+typedef uint8_t Piece;
 
 #define PAWN 0
 #define KNIGHT 1
@@ -16,6 +21,7 @@
 #define ROOK 3
 #define QUEEN 4
 #define KING 5
+#define PIECE_NONE 6
 
 #define CR_NONE 0
 #define CR_WHITE_SHORT 1
@@ -41,24 +47,55 @@
 #define FILE_G 0x0202020202020202ULL
 #define FILE_H 0x0101010101010101ULL
 
+#define WHITE_SHORT_CASTLE_CLEARANCE_MASK 0x06ULL
+#define WHITE_LONG_CASTLE_CLEARANCE_MASK 0x70ULL
+#define BLACK_SHORT_CASTLE_CLEARANCE_MASK 0x0600000000000000ULL
+#define BLACK_LONG_CASTLE_CLEARANCE_MASK 0x7000000000000000ULL
+
 typedef enum {
   WHITE_TO_MOVE,
   BLACK_TO_MOVE,
 } ToMove;
 
+typedef enum {
+  GS_ONGOING,
+  GS_WHITE_WON,
+  GS_BLACK_WON,
+  GS_DRAW, // TODO: maybe replace with individual draw conditions?
+} GameState;
+
 typedef uint64_t Bitboard;
 
-typedef struct {
+// contains all gamestate details that may be lost between moves
+typedef struct GameStateDetails {
+  uint8_t halfmove_clock;
+  uint8_t castling_rights;
+  Bitboard en_passant;
+  Piece captured_piece; // PIECE_NONE if no piece was captured on that turn (or
+                        // current state)
+} GameStateDetails;
+
+typedef struct Board {
+  GameState game_state;
   Bitboard pieces[2][6];
   Bitboard occupied_by_color[2];
   Bitboard occupied;
   ToMove to_move;
+  Piece piece_table[64];
+
+  // TODO:replace with GSD
+  uint8_t halfmove_clock;
   uint8_t castling_rights;
   Bitboard en_passant;
-  uint8_t halfmove_clock;
 } Board;
 
+Board *init_default_board();
+void board_make_move(Board *board, Move move);
+
+// slow, should only be run when setting up board
 void board_update_occupied(Board *board);
+// slow, should only be run when setting up board
+void board_update_piece_table(Board *board);
 
 char *square_to_string(int index);
 char *board_to_string(Board *board);

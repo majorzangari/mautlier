@@ -4,13 +4,19 @@
 #ifndef MOVE_H
 #define MOVE_H
 
-#include "board.h"
 #include <stdint.h>
+
+// from board.h
+typedef struct Board Board;
 
 #define MAX_MOVES 256
 
 #define lsb_index(bb) (__builtin_ctzll(bb))
 #define pop_lsb(bb) ((bb) &= (bb) - 1)
+
+#define move_from_square(move) ((move) >> 10)
+#define move_to_square(move) ((move >> 4 & 0x3f))
+#define move_flags(move) ((move) & 0x0f)
 
 #define FLAGS_NONE 0
 #define FLAGS_DOUBLE_PUSH 1
@@ -28,7 +34,6 @@
 #define FLAGS_CAPTURE 8
 
 typedef uint16_t Move;
-
 int generate_moves(Board *board, Move moves[MAX_MOVES]);
 
 #endif // MOVE_H

@@ -3,12 +3,15 @@ project(mautlier C)
 
 set(CMAKE_C_STANDARD 11)
 
-add_executable(mautlier main.c
-        state/board.h
+add_executable(mautlier 
+        main.c
         state/board.c
-        state/fen.h
         state/fen.c
-        state/move.h
         state/move.c
-        state/constants.h
-        state/constants.c)
+        state/constants.c
+)
+
+target_include_directories(mautlier PRIVATE
+    ${CMAKE_SOURCE_DIR}/state
+    ${CMAKE_SOURCE_DIR}/utils
+)

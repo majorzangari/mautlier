@@ -135,7 +135,7 @@ void init_rook_blockers() {
       if (file != 7)
         blockers &= ~FILE_A;
       if (file != 0)
-        blockers &= FILE_H;
+        blockers &= ~FILE_H;
 
       int index = rank * 8 + file;
       blockers &= ~(1ULL << index);

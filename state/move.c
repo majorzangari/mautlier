@@ -5,6 +5,7 @@
 #include "move.h"
 #include "board.h"
 #include "constants.h"
+#include <stdbool.h>
 
 static inline Move encode_move(int from_square, int to_square, int flags) {
   return (from_square << 10) | (to_square << 4) | flags;
@@ -24,9 +25,15 @@ int generate_pawn_pushes(Bitboard pawns, Bitboard occupied, Move *moves,
   Bitboard temp_single_dest = single_push_dest;
   while (temp_single_dest) {
     int to_square = lsb_index(temp_single_dest);
-    int from_square = (color == WHITE) ? to_square + 8 : to_square - 8;
-    *moves++ = encode_move(from_square, to_square,
-                           0); // TODO: add other flags, promotion
+    int from_square = (color == WHITE) ? to_square - 8 : to_square + 8;
+    bool promote = (color == WHITE) ? to_square >= 56 : to_square <= 7;
+    if (promote) {
+      *moves++ = encode_move(from_square, to_square, FLAGS_KNIGHT_PROMOTION);
+      *moves++ = encode_move(from_square, to_square, FLAGS_BISHOP_PROMOTION);
+      *moves++ = encode_move(from_square, to_square, FLAGS_ROOK_PROMOTION);
+      *moves++ = encode_move(from_square, to_square, FLAGS_BISHOP_PROMOTION);
+    }
+    *moves++ = encode_move(from_square, to_square, 0);
     num_moves++;
     pop_lsb(temp_single_dest);
   }
@@ -37,9 +44,10 @@ int generate_pawn_pushes(Bitboard pawns, Bitboard occupied, Move *moves,
                        : ((single_push_dest >> 8) & empty & double_rank);
   while (double_push_dest) {
     int to_square = lsb_index(double_push_dest);
-    int from_square = (color == WHITE) ? to_square + 16 : to_square - 16;
-    *moves++ = encode_move(from_square, to_square,
-                           0); // TODO: add other flags (might not be necessary)
+    int from_square = (color == WHITE) ? to_square - 16 : to_square + 16;
+    *moves++ = encode_move(
+        from_square, to_square,
+        FLAGS_DOUBLE_PUSH); // TODO: add other flags (might not be necessary)
     num_moves++;
     pop_lsb(double_push_dest);
   }
@@ -61,18 +69,39 @@ int generate_pawn_captures(Bitboard pawns, Bitboard enemy_occupied, Move *moves,
   while (left_capture) {
     int to_square = lsb_index(left_capture);
     int from_square = (color == WHITE) ? to_square - 9 : to_square + 7;
-    *moves++ = encode_move(from_square, to_square,
-                           1); // TODO: add other flags CAPTURE
-    num_moves++;
+    bool promote = (color == WHITE) ? to_square >= 56 : to_square <= 7;
+    if (promote) {
+      *moves++ = encode_move(from_square, to_square, FLAGS_KNIGHT_PROMOTION);
+      *moves++ = encode_move(from_square, to_square, FLAGS_BISHOP_PROMOTION);
+      *moves++ = encode_move(from_square, to_square, FLAGS_ROOK_PROMOTION);
+      *moves++ = encode_move(from_square, to_square, FLAGS_QUEEN_PROMOTION);
+      num_moves += 4;
+    } else {
+      *moves++ = encode_move(from_square, to_square,
+                             FLAGS_CAPTURE); // TODO: add other flags CAPTURE
+      num_moves++;
+    }
     pop_lsb(left_capture);
   }
 
   while (right_capture) {
     int to_square = lsb_index(right_capture);
     int from_square = (color == WHITE) ? to_square - 7 : to_square + 9;
-    *moves++ = encode_move(from_square, to_square,
-                           1); // TODO: add other flags CAPTURE
-    num_moves++;
+    bool promote = (color == WHITE) ? to_square >= 56 : to_square <= 7;
+    if (promote) {
+      *moves++ = encode_move(from_square, to_square,
+                             FLAGS_KNIGHT_PROMOTION | FLAGS_CAPTURE);
+      *moves++ = encode_move(from_square, to_square,
+                             FLAGS_BISHOP_PROMOTION | FLAGS_CAPTURE);
+      *moves++ = encode_move(from_square, to_square,
+                             FLAGS_ROOK_PROMOTION | FLAGS_CAPTURE);
+      *moves++ = encode_move(from_square, to_square,
+                             FLAGS_QUEEN_PROMOTION | FLAGS_CAPTURE);
+      num_moves += 4;
+    } else {
+      *moves++ = encode_move(from_square, to_square, FLAGS_CAPTURE);
+      num_moves++;
+    }
     pop_lsb(right_capture);
   }
 
@@ -102,8 +131,7 @@ int generate_en_passant(Bitboard pawns, Bitboard ep, ToMove color,
 
   while (attackers) {
     int from_sq = lsb_index(attackers);
-    *moves++ = encode_move(from_sq, ep_square,
-                           0); // TODO: add other flags CAPTURE
+    *moves++ = encode_move(from_sq, ep_square, FLAGS_EN_PASSANT);
     num_moves++;
     pop_lsb(attackers);
   }
@@ -198,6 +226,37 @@ int generate_bishop_moves(Bitboard bishops, Bitboard occupied,
   return num_moves;
 }
 
+int generate_castling(Board *board, Move *moves) {
+  bool short_available = (board->to_move == WHITE)
+                             ? (board->castling_rights & CR_WHITE_SHORT)
+                             : (board->castling_rights & CR_BLACK_SHORT);
+  bool long_available = (board->to_move == WHITE)
+                            ? (board->castling_rights & CR_WHITE_LONG)
+                            : (board->castling_rights & CR_BLACK_LONG);
+
+  int num_moves = 0;
+
+  if (short_available) {
+    Bitboard clearance_mask = (board->to_move == WHITE)
+                                  ? WHITE_SHORT_CASTLE_CLEARANCE_MASK
+                                  : BLACK_SHORT_CASTLE_CLEARANCE_MASK;
+    if ((board->occupied & clearance_mask) == 0) {
+      *moves++ = encode_move(0, 0, FLAGS_SHORT_CASTLE);
+      num_moves++;
+    }
+  }
+  if (long_available) {
+    Bitboard clearance_mask = (board->to_move == WHITE)
+                                  ? WHITE_LONG_CASTLE_CLEARANCE_MASK
+                                  : BLACK_LONG_CASTLE_CLEARANCE_MASK;
+    if ((board->occupied & clearance_mask) == 0) {
+      *moves++ = encode_move(0, 0, FLAGS_LONG_CASTLE);
+      num_moves++;
+    }
+  }
+  return num_moves;
+}
+
 int generate_moves(Board *board, Move moves[MAX_MOVES]) {
   int move_count = 0;
 
@@ -223,6 +282,7 @@ int generate_moves(Board *board, Move moves[MAX_MOVES]) {
                                     same_side_occupied, moves + move_count);
   move_count += generate_bishop_moves(bishops | queens, board->occupied,
                                       same_side_occupied, moves + move_count);
+  move_count += generate_castling(board, moves);
 
   *(moves + move_count) = (uint16_t)0; // TEMP
   return move_count;

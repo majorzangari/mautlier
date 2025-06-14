@@ -4,11 +4,11 @@
 #include "state/move.h"
 
 #include <stdio.h>
+#include <stdlib.h>
 
 int main(void) {
   init_data();
-
-  char str[] = "rnbqkbnr/8/8/8/4B3/8/8/8 w KQkq - 0 1";
+  char str[] = "rnbqkbnr/pppPpppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
   Board *board = fen_to_board(str);
   printf("%s\n", board_to_string(board));
   Move moves[MAX_MOVES];
@@ -19,5 +19,6 @@ int main(void) {
     int flags = (moves[i] & 0x000F);
     printf("Move %d: from %d to %d flags %d\n", i, from, to, flags);
   }
+  free(board);
   return 0;
 }
