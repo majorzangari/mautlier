@@ -7,6 +7,8 @@
 
 #include <stdint.h>
 
+#include "stack.h"
+
 // from move.h
 typedef uint16_t Move;
 
@@ -74,6 +76,11 @@ typedef struct GameStateDetails {
   Piece captured_piece; // PIECE_NONE if no piece was captured on that turn (or
                         // current state)
 } GameStateDetails;
+
+#define MAX_SAVED_GAMESTATES                                                   \
+  16384 // Max a chess game could need is ~12,000 but 99% will be less than 512
+        // (or 1024 for safety)
+DEFINE_STACK_TYPE(GameStateDetailsStack, GameStateDetails, MAX_SAVED_GAMESTATES)
 
 typedef struct Board {
   GameState game_state;
