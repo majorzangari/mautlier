@@ -44,16 +44,21 @@ void board_make_move(Board *board, Move move) {
   uint8_t to_square = move_to_square(move);
   uint8_t flags = move_flags(move);
 
-  board->en_passant = 0;
+  GameStateDetails new_state = {0};
+  new_state.halfmove_clock = BOARD_CURR_STATE(board).halfmove_clock + 1;
+  new_state.castling_rights = BOARD_CURR_STATE(board).castling_rights;
+  new_state.captured_piece = PIECE_NONE; // TODO: might not have to set this now
+
   switch (flags) {
   case FLAGS_DOUBLE_PUSH:
     move_piece(board, from_square, to_square);
-    board->en_passant = (board->to_move == WHITE) ? (1ULL << (from_square + 8))
-                                                  : (1ULL << (from_square - 8));
+    new_state.en_passant = (board->to_move == WHITE)
+                               ? (1ULL << (from_square + 8))
+                               : (1ULL << (from_square - 8));
     break;
   case FLAGS_SHORT_CASTLE:
     if (board->to_move == WHITE) {
-      board->castling_rights &= ~(CR_WHITE_SHORT | CR_WHITE_LONG);
+      new_state.castling_rights &= ~(CR_WHITE_SHORT | CR_WHITE_LONG);
       board->pieces[WHITE][KING] |= 0xAULL;
       board->pieces[WHITE][ROOK] |= 0x5ULL;
       board->piece_table[0] = PIECE_NONE;
@@ -61,7 +66,7 @@ void board_make_move(Board *board, Move move) {
       board->piece_table[2] = ROOK;
       board->piece_table[3] = PIECE_NONE;
     } else {
-      board->castling_rights &= ~(CR_BLACK_SHORT | CR_BLACK_LONG);
+      new_state.castling_rights &= ~(CR_BLACK_SHORT | CR_BLACK_LONG);
       board->pieces[BLACK][KING] |= 0xA00000000000000ULL;
       board->pieces[BLACK][ROOK] |= 0x500000000000000ULL;
       board->piece_table[56] = PIECE_NONE;
@@ -72,7 +77,7 @@ void board_make_move(Board *board, Move move) {
     break;
   case FLAGS_LONG_CASTLE:
     if (board->to_move == WHITE) {
-      board->castling_rights &= ~(CR_WHITE_SHORT | CR_WHITE_LONG);
+      new_state.castling_rights &= ~(CR_WHITE_SHORT | CR_WHITE_LONG);
       board->pieces[WHITE][KING] |= 0x28ULL;
       board->pieces[WHITE][ROOK] |= 0x90ULL;
       board->piece_table[3] = PIECE_NONE;
@@ -80,7 +85,7 @@ void board_make_move(Board *board, Move move) {
       board->piece_table[5] = KING;
       board->piece_table[7] = PIECE_NONE;
     } else {
-      board->castling_rights &= ~(CR_BLACK_SHORT | CR_BLACK_LONG);
+      new_state.castling_rights &= ~(CR_BLACK_SHORT | CR_BLACK_LONG);
       board->pieces[BLACK][KING] |= 0x2800000000000000ULL;
       board->pieces[BLACK][ROOK] |= 0x9000000000000000ULL;
       board->piece_table[59] = PIECE_NONE;
@@ -98,6 +103,7 @@ void board_make_move(Board *board, Move move) {
     if (flags & FLAGS_QUEEN_PROMOTION) set_piece(board, to_square, QUEEN);
   }
   board->to_move = 1 - board->to_move; // Switch turns
+  GameStateDetailsStack_push(&board->game_state_stack, new_state);
 }
 
 bool board_valid(Board *board) {

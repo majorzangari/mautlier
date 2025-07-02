@@ -79,7 +79,7 @@ typedef struct GameStateDetails {
 
 #define MAX_SAVED_GAMESTATES                                                   \
   16384 // Max a chess game could need is ~12,000 but 99% will be less than 512
-        // (or 1024 for safety)
+        // (538 was the most any tournament game took)
 DEFINE_STACK_TYPE(GameStateDetailsStack, GameStateDetails, MAX_SAVED_GAMESTATES)
 
 typedef struct Board {
@@ -90,11 +90,14 @@ typedef struct Board {
   ToMove to_move;
   Piece piece_table[64];
 
-  // TODO:replace with GSD
-  uint8_t halfmove_clock;
-  uint8_t castling_rights;
-  Bitboard en_passant;
+  // uint8_t halfmove_clock;
+  // uint8_t castling_rights;
+  // Bitboard en_passant;
+  GameStateDetailsStack game_state_stack;
 } Board;
+
+#define BOARD_CURR_STATE(board)                                                \
+  ((board)->game_state_stack.data[(board)->game_state_stack.top])
 
 Board *init_default_board();
 void board_make_move(Board *board, Move move);

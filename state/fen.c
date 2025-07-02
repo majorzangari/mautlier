@@ -134,13 +134,11 @@ Board *fen_to_board(char *fen) {
 
   details.captured_piece = PIECE_NONE;
 
-  out->castling_rights = details.castling_rights;
-  out->en_passant = details.en_passant;
-  out->halfmove_clock = details.halfmove_clock;
-  out->game_state = GS_ONGOING;
+  out->game_state =
+      GS_ONGOING; // should be checking this, but for now just set it to ongoing
 
-  // GameStateDetailsStack_init(&out->game_state_details);
-  // GameStateDetailsStack_push(&out->game_state_details, details);
+  GameStateDetailsStack_init(&out->game_state_stack);
+  GameStateDetailsStack_push(&out->game_state_stack, details);
 
   return out;
 }
@@ -188,18 +186,20 @@ char *board_to_fen(Board *board) {
   out[index++] = (board->to_move == WHITE_TO_MOVE) ? 'w' : 'b';
   out[index++] = ' ';
 
+  GameStateDetails curr_state = BOARD_CURR_STATE(board);
+
   // clang-format off
-  if ((board->castling_rights | CR_WHITE_SHORT) > 0) out[index++] = 'K';
-  if ((board->castling_rights | CR_BLACK_SHORT) > 0) out[index++] = 'k';
-  if ((board->castling_rights | CR_WHITE_LONG) > 0) out[index++] = 'Q';
-  if ((board->castling_rights | CR_BLACK_LONG) > 0) out[index++] = 'q';
+  if ((curr_state.castling_rights | CR_WHITE_SHORT) > 0) out[index++] = 'K';
+  if ((curr_state.castling_rights | CR_BLACK_SHORT) > 0) out[index++] = 'k';
+  if ((curr_state.castling_rights | CR_WHITE_LONG) > 0) out[index++] = 'Q';
+  if ((curr_state.castling_rights | CR_BLACK_LONG) > 0) out[index++] = 'q';
   // clang-format on
 
   out[index++] = ' ';
-  if (board->en_passant == 0)
+  if (curr_state.en_passant == 0)
     out[index++] = '-';
   else {
-    int ep_index = lsb_index(board->en_passant);
+    int ep_index = lsb_index(curr_state.en_passant);
     char *square_str = square_to_string(ep_index);
     strcpy(out + index, square_to_string(ep_index));
     free(square_str);
@@ -207,7 +207,7 @@ char *board_to_fen(Board *board) {
   }
 
   index += snprintf(
-      out + index, buffer_size - index, " %d %d", board->halfmove_clock,
+      out + index, buffer_size - index, " %d %d", curr_state.halfmove_clock,
       0); // TODO: actually write a real fullmove clock if I end up storing it
   out[index] = '\0';
   return out;

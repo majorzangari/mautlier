@@ -226,13 +226,13 @@ int generate_bishop_moves(Bitboard bishops, Bitboard occupied,
   return num_moves;
 }
 
-int generate_castling(Board *board, Move *moves) {
+int generate_castling(Board *board, Move *moves, GameStateDetails details) {
   bool short_available = (board->to_move == WHITE)
-                             ? (board->castling_rights & CR_WHITE_SHORT)
-                             : (board->castling_rights & CR_BLACK_SHORT);
+                             ? (details.castling_rights & CR_WHITE_SHORT)
+                             : (details.castling_rights & CR_BLACK_SHORT);
   bool long_available = (board->to_move == WHITE)
-                            ? (board->castling_rights & CR_WHITE_LONG)
-                            : (board->castling_rights & CR_BLACK_LONG);
+                            ? (details.castling_rights & CR_WHITE_LONG)
+                            : (details.castling_rights & CR_BLACK_LONG);
 
   int num_moves = 0;
 
@@ -260,6 +260,8 @@ int generate_castling(Board *board, Move *moves) {
 int generate_moves(Board *board, Move moves[MAX_MOVES]) {
   int move_count = 0;
 
+  GameStateDetails gsd = BOARD_CURR_STATE(board);
+
   Bitboard pawns = board->pieces[board->to_move][PAWN];
   Bitboard knights = board->pieces[board->to_move][KNIGHT];
   Bitboard bishops = board->pieces[board->to_move][BISHOP];
@@ -274,7 +276,7 @@ int generate_moves(Board *board, Move moves[MAX_MOVES]) {
                                      board->to_move);
   move_count += generate_pawn_captures(pawns, enemy_side_occupied,
                                        moves + move_count, board->to_move);
-  move_count += generate_en_passant(pawns, board->en_passant, board->to_move,
+  move_count += generate_en_passant(pawns, gsd.en_passant, board->to_move,
                                     moves + move_count);
   move_count +=
       generate_king_moves(kings, same_side_occupied, moves + move_count);
@@ -282,8 +284,8 @@ int generate_moves(Board *board, Move moves[MAX_MOVES]) {
                                     same_side_occupied, moves + move_count);
   move_count += generate_bishop_moves(bishops | queens, board->occupied,
                                       same_side_occupied, moves + move_count);
-  move_count += generate_castling(board, moves);
+  move_count += generate_castling(board, moves, gsd);
 
-  *(moves + move_count) = (uint16_t)0; // TEMP
+  *(moves + move_count) = (uint16_t)0; // temp TODO: remove
   return move_count;
 }
