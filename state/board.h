@@ -55,8 +55,8 @@ typedef uint8_t Piece;
 #define BLACK_LONG_CASTLE_CLEARANCE_MASK 0x7000000000000000ULL
 
 typedef enum {
-  WHITE_TO_MOVE,
-  BLACK_TO_MOVE,
+  WHITE_TO_MOVE = 0,
+  BLACK_TO_MOVE = 1,
 } ToMove;
 
 typedef enum {
@@ -101,6 +101,7 @@ typedef struct Board {
 
 Board *init_default_board();
 void board_make_move(Board *board, Move move);
+void board_unmake_move(Board *board, Move move);
 
 // slow, should only be run when setting up board
 void board_update_occupied(Board *board);

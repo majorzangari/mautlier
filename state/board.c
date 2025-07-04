@@ -15,49 +15,52 @@ Board *init_default_board() {
       "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1");
 }
 
-static inline void move_piece(Board *board, int from_square, int to_square) {
-  int piece = board->piece_table[from_square];
-  int color = board->to_move;
+static inline void move_piece(Board *board, GameStateDetails *state,
+                              int from_square, int to_square) {
+  Piece piece = board->piece_table[from_square];
+  ToMove color = board->to_move;
   board->pieces[color][piece] &= ~(1ULL << from_square);
   board->pieces[color][piece] |= (1ULL << to_square);
-  if (board->piece_table[to_square] != PIECE_NONE) {
-    int captured_color = color == WHITE ? BLACK : WHITE;
-    int captured_piece = board->piece_table[to_square];
-    board->pieces[captured_color][captured_piece] &= ~(1ULL << to_square);
+  Piece previous_piece = board->piece_table[to_square];
+  if (previous_piece != PIECE_NONE) {
+    ToMove captured_color = color == WHITE ? BLACK : WHITE;
+    board->pieces[captured_color][previous_piece] &= ~(1ULL << to_square);
+    state->captured_piece = previous_piece;
   }
   board->piece_table[to_square] = piece;
   board->piece_table[from_square] = PIECE_NONE;
 }
 
+// does not set captured piece
 static inline void set_piece(Board *board, int square, Piece piece) {
-  int color = board->to_move;
-  int previous_piece = board->piece_table[square];
+  ToMove color = board->to_move;
+  Piece previous_piece = board->piece_table[square];
   if (previous_piece != PIECE_NONE) {
     board->pieces[color][previous_piece] &= ~(1ULL << square);
   }
   board->pieces[color][piece] |= (1ULL << square);
   board->piece_table[square] = piece;
 }
-
+// TODO: check capture flag instead of piece board
 void board_make_move(Board *board, Move move) {
   uint8_t from_square = move_from_square(move);
   uint8_t to_square = move_to_square(move);
   uint8_t flags = move_flags(move);
 
-  GameStateDetails new_state = {0};
+  GameStateDetails new_state = {0}; // TODO: push and then edit to save copy
   new_state.halfmove_clock = BOARD_CURR_STATE(board).halfmove_clock + 1;
   new_state.castling_rights = BOARD_CURR_STATE(board).castling_rights;
-  new_state.captured_piece = PIECE_NONE; // TODO: might not have to set this now
+  new_state.captured_piece = PIECE_NONE;
 
   switch (flags) {
   case FLAGS_DOUBLE_PUSH:
-    move_piece(board, from_square, to_square);
+    move_piece(board, &new_state, from_square, to_square);
     new_state.en_passant = (board->to_move == WHITE)
                                ? (1ULL << (from_square + 8))
                                : (1ULL << (from_square - 8));
     break;
   case FLAGS_SHORT_CASTLE:
-    if (board->to_move == WHITE) {
+    if (board->to_move == WHITE) { // TODO team check is bloat
       new_state.castling_rights &= ~(CR_WHITE_SHORT | CR_WHITE_LONG);
       board->pieces[WHITE][KING] |= 0xAULL;
       board->pieces[WHITE][ROOK] |= 0x5ULL;
@@ -76,7 +79,7 @@ void board_make_move(Board *board, Move move) {
     }
     break;
   case FLAGS_LONG_CASTLE:
-    if (board->to_move == WHITE) {
+    if (board->to_move == WHITE) { // TODO: team check is bloat
       new_state.castling_rights &= ~(CR_WHITE_SHORT | CR_WHITE_LONG);
       board->pieces[WHITE][KING] |= 0x28ULL;
       board->pieces[WHITE][ROOK] |= 0x90ULL;
@@ -95,15 +98,62 @@ void board_make_move(Board *board, Move move) {
     }
     break;
   default:
-    move_piece(board, from_square, to_square);
+    move_piece(board, &new_state, from_square, to_square);
     // clang-format off
     if (flags & FLAGS_KNIGHT_PROMOTION) set_piece(board, to_square, KNIGHT);
     if (flags & FLAGS_BISHOP_PROMOTION) set_piece(board, to_square, BISHOP);
     if (flags & FLAGS_BISHOP_PROMOTION) set_piece(board, to_square, ROOK);
     if (flags & FLAGS_QUEEN_PROMOTION) set_piece(board, to_square, QUEEN);
+    // clang-format on
   }
   board->to_move = 1 - board->to_move; // Switch turns
-  GameStateDetailsStack_push(&board->game_state_stack, new_state);
+  GameStateDetailsStack_push(&board->game_state_stack,
+                             new_state); // slow copy i think
+}
+
+void board_unmake_move(Board *board, Move move) {
+  Piece captured_piece =
+      GameStateDetailsStack_pop(&board->game_state_stack).captured_piece;
+  uint8_t from_square = move_from_square(move);
+  uint8_t to_square = move_to_square(move);
+  uint8_t flags = move_flags(move);
+
+  switch (flags) {
+  case FLAGS_SHORT_CASTLE:
+    if (board->to_move == WHITE) {
+      board->pieces[WHITE][KING] |= 0xAULL;
+      board->pieces[WHITE][ROOK] |= 0x5ULL;
+      board->piece_table[0] = ROOK;
+      board->piece_table[1] = PIECE_NONE;
+      board->piece_table[2] = PIECE_NONE;
+      board->piece_table[3] = KING;
+    } else {
+      board->pieces[BLACK][KING] |= 0xA00000000000000ULL;
+      board->pieces[BLACK][ROOK] |= 0x500000000000000ULL;
+      board->piece_table[56] = ROOK;
+      board->piece_table[57] = PIECE_NONE;
+      board->piece_table[58] = PIECE_NONE;
+      board->piece_table[59] = KING;
+    }
+    break;
+  case FLAGS_LONG_CASTLE:
+    if (board->to_move == WHITE) {
+      board->pieces[WHITE][KING] |= 0x28ULL;
+      board->pieces[WHITE][ROOK] |= 0x90ULL;
+      board->piece_table[3] = KING;
+      board->piece_table[4] = PIECE_NONE;
+      board->piece_table[5] = PIECE_NONE;
+      board->piece_table[7] = ROOK;
+    } else {
+      board->pieces[BLACK][KING] |= 0x2800000000000000ULL;
+      board->pieces[BLACK][ROOK] |= 0x9000000000000000ULL;
+      board->piece_table[59] = KING;
+      board->piece_table[60] = PIECE_NONE;
+      board->piece_table[61] = PIECE_NONE;
+      board->piece_table[63] = ROOK;
+    }
+    break;
+  }
 }
 
 bool board_valid(Board *board) {
