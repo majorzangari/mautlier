@@ -32,8 +32,9 @@ int generate_pawn_pushes(Bitboard pawns, Bitboard occupied, Move *moves,
       *moves++ = encode_move(from_square, to_square, FLAGS_BISHOP_PROMOTION);
       *moves++ = encode_move(from_square, to_square, FLAGS_ROOK_PROMOTION);
       *moves++ = encode_move(from_square, to_square, FLAGS_BISHOP_PROMOTION);
+    } else {
+      *moves++ = encode_move(from_square, to_square, FLAGS_PAWN_PUSH);
     }
-    *moves++ = encode_move(from_square, to_square, 0);
     num_moves++;
     pop_lsb(temp_single_dest);
   }

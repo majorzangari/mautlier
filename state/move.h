@@ -22,16 +22,19 @@ typedef struct Board Board;
 #define FLAGS_DOUBLE_PUSH 1
 #define FLAGS_SHORT_CASTLE 2
 #define FLAGS_LONG_CASTLE 3
-#define FLAGS_PROMOTION 4
 #define FLAGS_KNIGHT_PROMOTION 4
 #define FLAGS_BISHOP_PROMOTION 5
 #define FLAGS_ROOK_PROMOTION 6
 #define FLAGS_QUEEN_PROMOTION 7
+#define FLAGS_CAPTURE 8
 #define FLAGS_EN_PASSANT 9
 
-// only flag that should be mixed with other flags
-// all other flags should be used alone
-#define FLAGS_CAPTURE 8
+#define FLAGS_PAWN_PUSH 10
+
+#define FLAGS_KNIGHT_PROMOTION_CAPTURE 12
+#define FLAGS_BISHOP_PROMOTION_CAPTURE 13
+#define FLAGS_ROOK_PROMOTION_CAPTURE 14
+#define FLAGS_QUEEN_PROMOTION_CAPTURE 15
 
 typedef uint16_t Move;
 int generate_moves(Board *board, Move moves[MAX_MOVES]);

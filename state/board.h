@@ -5,6 +5,7 @@
 #ifndef BOARD_H
 #define BOARD_H
 
+#include <stdbool.h>
 #include <stdint.h>
 
 #include "stack.h"
@@ -83,16 +84,12 @@ typedef struct GameStateDetails {
 DEFINE_STACK_TYPE(GameStateDetailsStack, GameStateDetails, MAX_SAVED_GAMESTATES)
 
 typedef struct Board {
-  GameState game_state;
+  // GameState game_state;
   Bitboard pieces[2][6];
   Bitboard occupied_by_color[2];
   Bitboard occupied;
   ToMove to_move;
   Piece piece_table[64];
-
-  // uint8_t halfmove_clock;
-  // uint8_t castling_rights;
-  // Bitboard en_passant;
   GameStateDetailsStack game_state_stack;
 } Board;
 
@@ -107,6 +104,11 @@ void board_unmake_move(Board *board, Move move);
 void board_update_occupied(Board *board);
 // slow, should only be run when setting up board
 void board_update_piece_table(Board *board);
+
+bool board_white_check(Board *board);
+bool board_black_check(Board *board);
+
+GameState board_check_gamestate(Board *board);
 
 char *square_to_string(int index);
 char *board_to_string(Board *board);
