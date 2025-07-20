@@ -7,6 +7,7 @@
 #include <stdlib.h>
 
 int main(void) {
+  srand(0); // TODO: set to time
   init_data();
   char str[] = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
   Board *board = fen_to_board(str);
