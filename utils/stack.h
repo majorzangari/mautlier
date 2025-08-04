@@ -35,8 +35,16 @@
       fprintf(stderr, "Stack is empty; cannot peek in %s\n", #name);           \
     }                                                                          \
     return stack->data[stack->top];                                            \
+  }                                                                            \
+                                                                               \
+  static inline stack_type name##_peek_down(name *stack, int depth) {          \
+    if (stack->top - depth < 0) {                                              \
+      fprintf(stderr,                                                          \
+              "Stack does not have enough elements to peek down in "           \
+              "%s\n",                                                          \
+              #name);                                                          \
+    }                                                                          \
+    return stack->data[stack->top - depth];                                    \
   }
-
-// TODO: add way to iterate
 
 #endif
