@@ -14,4 +14,5 @@ add_executable(mautlier
 target_include_directories(mautlier PRIVATE
     ${CMAKE_SOURCE_DIR}/state
     ${CMAKE_SOURCE_DIR}/utils
+    ${CMAKE_SOURCE_DIR}/hash
 )

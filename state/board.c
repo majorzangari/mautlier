@@ -3,7 +3,9 @@
 //
 
 #include "board.h"
+#include "bithelpers.h"
 #include "fen.h"
+#include "hash.h"
 #include "move.h"
 
 #include <stdbool.h>
@@ -22,44 +24,224 @@ static inline void move_piece(Board *board, GameStateDetails *state,
   ToMove color = board->to_move;
   board->pieces[color][piece] &= ~(1ULL << from_square);
   board->pieces[color][piece] |= (1ULL << to_square);
+  board->occupied_by_color[color] &= ~(1ULL << from_square);
+  board->occupied_by_color[color] |= (1ULL << to_square);
+  board->occupied &= ~(1ULL << from_square);
+  board->occupied |= (1ULL << to_square);
+
   Piece previous_piece = board->piece_table[to_square];
   if (flags & FLAGS_CAPTURE) {
     ToMove captured_color = color == WHITE ? BLACK : WHITE;
     board->pieces[captured_color][previous_piece] &= ~(1ULL << to_square);
+    board->occupied_by_color[captured_color] &= ~(1ULL << to_square);
     state->captured_piece = previous_piece;
+    state->halfmove_clock = 0;
+    state->hash =
+        toggle_piece(state->hash, previous_piece, to_square, captured_color);
   }
   board->piece_table[to_square] = piece;
   board->piece_table[from_square] = PIECE_NONE;
+  state->hash =
+      move_piece_hash(state->hash, piece, from_square, to_square, color);
 }
 
+// SHOULD BE USED AFTER POPPING THE STATE
 static inline void undo_move_piece(Board *board, uint8_t to_square,
                                    uint8_t from_square, uint8_t flags) {
+  Piece piece = board->piece_table[to_square];
+  Piece previous_piece = BOARD_CURR_STATE(board).captured_piece;
+  ToMove color = OPPOSITE_COLOR(board->to_move);
+  board->pieces[color][piece] &= ~(1ULL << to_square);
+  board->pieces[color][piece] |= (1ULL << from_square);
+  board->occupied_by_color[color] &= ~(1ULL << to_square);
+  board->occupied_by_color[color] |= (1ULL << from_square);
+  board->occupied |= (1ULL << from_square);
 
-  Piece piece = board->piece_table[from_square];
-  ToMove color = board->to_move == WHITE ? BLACK : WHITE;
-  board->pieces[color][piece] &= ~(1ULL << from_square);
-  board->pieces[color][piece] |= (1ULL << to_square);
-  Piece previous_piece = board->piece_table[to_square];
-  if (flags & FLAGS_CAPTURE) {
-    ToMove captured_color = color == WHITE ? BLACK : WHITE;
-    board->pieces[captured_color][previous_piece] &= ~(1ULL << to_square);
+  if (previous_piece != PIECE_NONE) {
+    ToMove captured_color = OPPOSITE_COLOR(color);
+    board->pieces[captured_color][previous_piece] |= (1ULL << to_square);
+    board->occupied_by_color[captured_color] |= (1ULL << to_square);
+    board->piece_table[to_square] = previous_piece;
+  } else {
+    board->occupied &= ~(1ULL << to_square);
   }
-  board->piece_table[to_square] = piece;
-  board->piece_table[from_square] = PIECE_NONE;
+  board->piece_table[to_square] = previous_piece;
+  board->piece_table[from_square] = piece;
 }
 
 // does not set captured piece
-static inline void set_piece(Board *board, int square, Piece piece) {
+static inline void set_piece(Board *board, GameStateDetails *state, int square,
+                             Piece piece) {
   ToMove color = board->to_move;
   Piece previous_piece = board->piece_table[square];
   if (previous_piece != PIECE_NONE) {
-    board->pieces[color][previous_piece] &= ~(1ULL << square);
+    board->pieces[OPPOSITE_COLOR(color)][previous_piece] &= ~(1ULL << square);
+    state->hash = toggle_piece(state->hash, previous_piece, square, color);
+    board->occupied_by_color[OPPOSITE_COLOR(color)] &= ~(1ULL << square);
   }
   board->pieces[color][piece] |= (1ULL << square);
   board->piece_table[square] = piece;
+  state->hash = toggle_piece(state->hash, piece, square, color);
+  board->occupied_by_color[color] |= (1ULL << square);
+  board->occupied |= (1ULL << square);
+}
+
+// hacky? basically a copy paste TODO: fix
+static inline void set_piece_no_hash(Board *board, int square, Piece piece) {
+  ToMove color = board->to_move;
+  Piece previous_piece = board->piece_table[square];
+  if (previous_piece != PIECE_NONE) {
+    board->pieces[OPPOSITE_COLOR(color)][previous_piece] &= ~(1ULL << square);
+    board->occupied_by_color[OPPOSITE_COLOR(color)] &= ~(1ULL << square);
+  }
+  board->pieces[color][piece] |= (1ULL << square);
+  board->piece_table[square] = piece;
+  board->occupied_by_color[color] |= (1ULL << square);
+  board->occupied |= (1ULL << square);
 }
 
 static inline void update_gamestate(Board *board) {}
+
+static inline void short_castle(Board *board, GameStateDetails *new_state) {
+  uint64_t current_hash = new_state->hash;
+  if (board->to_move == WHITE) {
+    board->pieces[WHITE][KING] |= 0xAULL;
+    board->pieces[WHITE][ROOK] |= 0x5ULL;
+    board->occupied_by_color[WHITE] |= 0xAULL | 0x5ULL;
+    board->occupied |= 0xAULL | 0x5ULL;
+
+    board->piece_table[0] = PIECE_NONE;
+    board->piece_table[1] = KING;
+    board->piece_table[2] = ROOK;
+    board->piece_table[3] = PIECE_NONE;
+
+    current_hash = move_piece_hash(current_hash, KING, 3, 1, WHITE);
+    current_hash = move_piece_hash(current_hash, ROOK, 0, 2, WHITE);
+    current_hash = toggle_castling_rights(current_hash, CR_WHITE_SHORT);
+    if (new_state->castling_rights & CR_WHITE_LONG) {
+      current_hash = toggle_castling_rights(current_hash, CR_WHITE_LONG);
+    }
+
+    new_state->castling_rights &= ~(CR_WHITE_SHORT | CR_WHITE_LONG);
+  } else {
+    board->pieces[BLACK][KING] |= 0xA00000000000000ULL;
+    board->pieces[BLACK][ROOK] |= 0x500000000000000ULL;
+    board->occupied_by_color[BLACK] |=
+        0xA00000000000000ULL | 0x500000000000000ULL;
+    board->occupied |= 0xA00000000000000ULL | 0x500000000000000ULL;
+
+    board->piece_table[56] = PIECE_NONE;
+    board->piece_table[57] = KING;
+    board->piece_table[58] = ROOK;
+    board->piece_table[59] = PIECE_NONE;
+
+    current_hash = move_piece_hash(current_hash, KING, 59, 57, BLACK);
+    current_hash = move_piece_hash(current_hash, ROOK, 56, 58, BLACK);
+    current_hash = toggle_castling_rights(current_hash, CR_BLACK_SHORT);
+    if (new_state->castling_rights & CR_BLACK_LONG) {
+      current_hash = toggle_castling_rights(current_hash, CR_BLACK_LONG);
+    }
+
+    new_state->castling_rights &= ~(CR_BLACK_SHORT | CR_BLACK_LONG);
+  }
+  new_state->hash = current_hash;
+  new_state->halfmove_clock = 0;
+}
+
+static inline void reverse_short_castle(Board *board) {
+  if (board->to_move == WHITE) {
+    board->pieces[WHITE][KING] |= 0xAULL;
+    board->pieces[WHITE][ROOK] |= 0x5ULL;
+    board->occupied_by_color[WHITE] |= 0xAULL | 0x5ULL;
+    board->occupied |= 0xAULL | 0x5ULL;
+
+    board->piece_table[0] = ROOK;
+    board->piece_table[1] = PIECE_NONE;
+    board->piece_table[2] = PIECE_NONE;
+    board->piece_table[3] = KING;
+  } else {
+    board->pieces[BLACK][KING] |= 0xA00000000000000ULL;
+    board->pieces[BLACK][ROOK] |= 0x500000000000000ULL;
+    board->occupied_by_color[BLACK] |=
+        0xA00000000000000ULL | 0x500000000000000ULL;
+    board->occupied |= 0xA00000000000000ULL | 0x500000000000000ULL;
+
+    board->piece_table[56] = ROOK;
+    board->piece_table[57] = PIECE_NONE;
+    board->piece_table[58] = PIECE_NONE;
+    board->piece_table[59] = KING;
+  }
+}
+
+static inline void long_castle(Board *board, GameStateDetails *new_state) {
+  uint64_t current_hash = new_state->hash;
+
+  if (board->to_move == WHITE) {
+    board->pieces[WHITE][KING] |= 0x28ULL;
+    board->pieces[WHITE][ROOK] |= 0x90ULL;
+    board->occupied_by_color[WHITE] |= 0x28ULL | 0x90ULL;
+    board->occupied |= 0x28ULL | 0x90ULL;
+
+    board->piece_table[3] = PIECE_NONE;
+    board->piece_table[4] = ROOK;
+    board->piece_table[5] = KING;
+    board->piece_table[7] = PIECE_NONE;
+
+    current_hash = move_piece_hash(current_hash, KING, 3, 5, WHITE);
+    current_hash = move_piece_hash(current_hash, ROOK, 7, 4, WHITE);
+    current_hash = toggle_castling_rights(current_hash, CR_WHITE_LONG);
+    if (new_state->castling_rights & CR_WHITE_SHORT) {
+      current_hash = toggle_castling_rights(current_hash, CR_WHITE_SHORT);
+    }
+
+    new_state->castling_rights &= ~(CR_WHITE_SHORT | CR_WHITE_LONG);
+  } else {
+    board->pieces[BLACK][KING] |= 0x2800000000000000ULL;
+    board->pieces[BLACK][ROOK] |= 0x9000000000000000ULL;
+    board->occupied_by_color[BLACK] |=
+        0x2800000000000000ULL | 0x9000000000000000ULL;
+    board->occupied |= 0x2800000000000000ULL | 0x9000000000000000ULL;
+
+    board->piece_table[59] = PIECE_NONE;
+    board->piece_table[60] = ROOK;
+    board->piece_table[61] = KING;
+    board->piece_table[63] = PIECE_NONE;
+
+    current_hash = move_piece_hash(current_hash, KING, 59, 61, BLACK);
+    current_hash = move_piece_hash(current_hash, ROOK, 63, 60, BLACK);
+    current_hash = toggle_castling_rights(current_hash, CR_BLACK_LONG);
+    if (new_state->castling_rights & CR_BLACK_SHORT) {
+      current_hash = toggle_castling_rights(current_hash, CR_BLACK_SHORT);
+    }
+    new_state->castling_rights &= ~(CR_BLACK_SHORT | CR_BLACK_LONG);
+  }
+  new_state->halfmove_clock = 0;
+}
+
+static inline void reverse_long_castle(Board *board) {
+  if (board->to_move == WHITE) {
+    board->pieces[WHITE][KING] |= 0x28ULL;
+    board->pieces[WHITE][ROOK] |= 0x90ULL;
+    board->occupied_by_color[WHITE] |= 0x28ULL | 0x90ULL;
+    board->occupied |= 0x28ULL | 0x90ULL;
+
+    board->piece_table[3] = KING;
+    board->piece_table[4] = PIECE_NONE;
+    board->piece_table[5] = PIECE_NONE;
+    board->piece_table[7] = ROOK;
+  } else {
+    board->pieces[BLACK][KING] |= 0x2800000000000000ULL;
+    board->pieces[BLACK][ROOK] |= 0x9000000000000000ULL;
+    board->occupied_by_color[BLACK] |=
+        0x2800000000000000ULL | 0x9000000000000000ULL;
+    board->occupied |= 0x2800000000000000ULL | 0x9000000000000000ULL;
+
+    board->piece_table[59] = KING;
+    board->piece_table[60] = PIECE_NONE;
+    board->piece_table[61] = PIECE_NONE;
+    board->piece_table[63] = ROOK;
+  }
+}
 
 // TODO: check capture flag instead of piece board
 void board_make_move(Board *board, Move move) {
@@ -71,72 +253,40 @@ void board_make_move(Board *board, Move move) {
   new_state.halfmove_clock = BOARD_CURR_STATE(board).halfmove_clock + 1;
   new_state.castling_rights = BOARD_CURR_STATE(board).castling_rights;
   new_state.captured_piece = PIECE_NONE;
-  // TODO: update halfmove clock
+  new_state.hash = toggle_turn(BOARD_CURR_STATE(board).hash);
+
   switch (flags) {
   case FLAGS_PAWN_PUSH:
     move_piece(board, &new_state, from_square, to_square, flags);
     new_state.halfmove_clock = 0;
+    break;
   case FLAGS_DOUBLE_PUSH:
     move_piece(board, &new_state, from_square, to_square, flags);
-    new_state.en_passant = (board->to_move == WHITE)
-                               ? (1ULL << (from_square + 8))
-                               : (1ULL << (from_square - 8));
-
     new_state.halfmove_clock = 0;
+    int ep_shift =
+        (board->to_move == WHITE) ? (to_square + 8) : (to_square - 8);
+    new_state.en_passant = 1ULL << ep_shift;
+    new_state.hash = toggle_en_passant(new_state.hash, new_state.en_passant);
     break;
   case FLAGS_SHORT_CASTLE:
-    if (board->to_move == WHITE) { // TODO team check is bloat
-      new_state.castling_rights &= ~(CR_WHITE_SHORT | CR_WHITE_LONG);
-      board->pieces[WHITE][KING] |= 0xAULL;
-      board->pieces[WHITE][ROOK] |= 0x5ULL;
-      board->piece_table[0] = PIECE_NONE;
-      board->piece_table[1] = KING;
-      board->piece_table[2] = ROOK;
-      board->piece_table[3] = PIECE_NONE;
-    } else {
-      new_state.castling_rights &= ~(CR_BLACK_SHORT | CR_BLACK_LONG);
-      board->pieces[BLACK][KING] |= 0xA00000000000000ULL;
-      board->pieces[BLACK][ROOK] |= 0x500000000000000ULL;
-      board->piece_table[56] = PIECE_NONE;
-      board->piece_table[57] = KING;
-      board->piece_table[58] = ROOK;
-      board->piece_table[59] = PIECE_NONE;
-    }
+    short_castle(board, &new_state);
     break;
   case FLAGS_LONG_CASTLE:
-    if (board->to_move == WHITE) { // TODO: team check is bloat
-      new_state.castling_rights &= ~(CR_WHITE_SHORT | CR_WHITE_LONG);
-      board->pieces[WHITE][KING] |= 0x28ULL;
-      board->pieces[WHITE][ROOK] |= 0x90ULL;
-      board->piece_table[3] = PIECE_NONE;
-      board->piece_table[4] = ROOK;
-      board->piece_table[5] = KING;
-      board->piece_table[7] = PIECE_NONE;
-    } else {
-      new_state.castling_rights &= ~(CR_BLACK_SHORT | CR_BLACK_LONG);
-      board->pieces[BLACK][KING] |= 0x2800000000000000ULL;
-      board->pieces[BLACK][ROOK] |= 0x9000000000000000ULL;
-      board->piece_table[59] = PIECE_NONE;
-      board->piece_table[60] = ROOK;
-      board->piece_table[61] = KING;
-      board->piece_table[63] = PIECE_NONE;
-    }
+    short_castle(board, &new_state);
     break;
   default:
     move_piece(board, &new_state, from_square, to_square, flags);
     // clang-format off
-    if (flags & FLAGS_KNIGHT_PROMOTION) set_piece(board, to_square, KNIGHT);
-    if (flags & FLAGS_BISHOP_PROMOTION) set_piece(board, to_square, BISHOP);
-    if (flags & FLAGS_BISHOP_PROMOTION) set_piece(board, to_square, ROOK);
-    if (flags & FLAGS_QUEEN_PROMOTION) set_piece(board, to_square, QUEEN);
+    if (flags & FLAGS_KNIGHT_PROMOTION) { set_piece(board, &new_state, to_square, KNIGHT); }
+    if (flags & FLAGS_BISHOP_PROMOTION) { set_piece(board, &new_state, to_square, BISHOP); }
+    if (flags & FLAGS_ROOK_PROMOTION) { set_piece(board, &new_state, to_square, ROOK); }
+    if (flags & FLAGS_QUEEN_PROMOTION) { set_piece(board, &new_state, to_square, QUEEN); }
     // clang-format on
-    if (flags & FLAGS_CAPTURE) {
-      new_state.halfmove_clock = 0;
-    }
+    break;
   }
-  board->to_move = (board->to_move == WHITE) ? BLACK : WHITE; // Switch turns
-  GameStateDetailsStack_push(&board->game_state_stack,
-                             new_state); // slow copy i think, maybe change
+  update_gamestate(board);
+  GameStateDetailsStack_push(&board->game_state_stack, new_state);
+  board->to_move = OPPOSITE_COLOR(board->to_move);
 }
 
 void board_unmake_move(Board *board, Move move) {
@@ -148,48 +298,20 @@ void board_unmake_move(Board *board, Move move) {
 
   switch (flags) {
   case FLAGS_SHORT_CASTLE:
-    if (board->to_move == WHITE) {
-      board->pieces[WHITE][KING] |= 0xAULL;
-      board->pieces[WHITE][ROOK] |= 0x5ULL;
-      board->piece_table[0] = ROOK;
-      board->piece_table[1] = PIECE_NONE;
-      board->piece_table[2] = PIECE_NONE;
-      board->piece_table[3] = KING;
-    } else {
-      board->pieces[BLACK][KING] |= 0xA00000000000000ULL;
-      board->pieces[BLACK][ROOK] |= 0x500000000000000ULL;
-      board->piece_table[56] = ROOK;
-      board->piece_table[57] = PIECE_NONE;
-      board->piece_table[58] = PIECE_NONE;
-      board->piece_table[59] = KING;
-    }
+    reverse_short_castle(board);
     break;
   case FLAGS_LONG_CASTLE:
-    if (board->to_move == WHITE) {
-      board->pieces[WHITE][KING] |= 0x28ULL;
-      board->pieces[WHITE][ROOK] |= 0x90ULL;
-      board->piece_table[3] = KING;
-      board->piece_table[4] = PIECE_NONE;
-      board->piece_table[5] = PIECE_NONE;
-      board->piece_table[7] = ROOK;
-    } else {
-      board->pieces[BLACK][KING] |= 0x2800000000000000ULL;
-      board->pieces[BLACK][ROOK] |= 0x9000000000000000ULL;
-      board->piece_table[59] = KING;
-      board->piece_table[60] = PIECE_NONE;
-      board->piece_table[61] = PIECE_NONE;
-      board->piece_table[63] = ROOK;
-    }
+    reverse_long_castle(board);
     break;
   default:
-    move_piece(board, &new_state, from_square, to_square, flags);
-    // clang-format off
-    if (flags & FLAGS_KNIGHT_PROMOTION) set_piece(board, to_square, KNIGHT);
-    if (flags & FLAGS_BISHOP_PROMOTION) set_piece(board, to_square, BISHOP);
-    if (flags & FLAGS_BISHOP_PROMOTION) set_piece(board, to_square, ROOK);
-    if (flags & FLAGS_QUEEN_PROMOTION) set_piece(board, to_square, QUEEN);
-    // clang-format on
+    undo_move_piece(board, to_square, from_square, flags);
+    if (captured_piece != PIECE_NONE) {
+      ToMove color = OPPOSITE_COLOR(board->to_move);
+      set_piece_no_hash(board, to_square, captured_piece);
+    }
+    break;
   }
+  board->to_move = OPPOSITE_COLOR(board->to_move);
 }
 
 bool board_valid(Board *board) {
@@ -201,6 +323,9 @@ bool board_valid(Board *board) {
       }
       all_pieces |= board->pieces[color][piece];
     }
+  }
+  if (all_pieces != board->occupied) {
+    return false;
   }
   return true;
 }

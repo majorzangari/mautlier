@@ -37,6 +37,14 @@ uint64_t zobrist_hash(const Board *board);
 // for adding or removing a piece
 uint64_t toggle_piece(uint64_t hash, Piece piece, int square, ToMove to_move);
 
+// shortcut for moving a piece in hash
+// NOTE: does not account for captures
+static inline uint64_t move_piece_hash(uint64_t hash, Piece piece,
+                                       int from_square, int to_square,
+                                       ToMove to_move) {
+  uint64_t hash2 = toggle_piece(hash, piece, from_square, to_move);
+  return toggle_piece(hash2, piece, to_square, to_move);
+}
 // toggle a single castling right in hash
 // note: USE ZOBRIST macros
 uint64_t toggle_castling_rights(uint64_t hash, int castling_rights);

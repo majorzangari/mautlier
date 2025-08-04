@@ -3,6 +3,7 @@
 //
 
 #include "fen.h"
+#include "hash.c"
 
 #include <stddef.h>
 #include <stdlib.h>
@@ -134,12 +135,9 @@ Board *fen_to_board(char *fen) {
 
   details.captured_piece = PIECE_NONE;
 
-  out->game_state =
-      GS_ONGOING; // should be checking this, but for now just set it to ongoing
-
   GameStateDetailsStack_init(&out->game_state_stack);
   GameStateDetailsStack_push(&out->game_state_stack, details);
-
+  BOARD_CURR_STATE(out).hash = zobrist_hash(out); // feels hacky
   return out;
 }
 

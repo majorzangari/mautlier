@@ -31,7 +31,7 @@ void init_zobrist() {
 
 uint64_t zobrist_hash(const Board *board) {
   uint64_t hash = 0;
-  for (int side = WHITE; side < BLACK; side++) {
+  for (int side = WHITE; side <= BLACK; side++) {
     for (Piece piece = PAWN; piece <= KING; piece++) {
       Bitboard piece_bb = board->pieces[side][piece];
       while (piece_bb) {
@@ -46,9 +46,10 @@ uint64_t zobrist_hash(const Board *board) {
     hash ^= side_hash;
   }
 
-  for (int cr = 0; cr < 16; cr >>= 1) {
-    if (BOARD_CURR_STATE(board).castling_rights & cr) {
-      hash ^= castling_hash[cr];
+  for (int cr_bit_index = 0; cr_bit_index < 4; cr_bit_index++) {
+    uint64_t cr_bit = 1ULL << cr_bit_index;
+    if (BOARD_CURR_STATE(board).castling_rights & cr_bit) {
+      hash ^= castling_hash[cr_bit_index];
     }
   }
 

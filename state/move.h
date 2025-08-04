@@ -4,15 +4,14 @@
 #ifndef MOVE_H
 #define MOVE_H
 
+#include "board.h"
+#include <stdbool.h>
 #include <stdint.h>
 
 // from board.h
 typedef struct Board Board;
 
 #define MAX_MOVES 256
-
-#define lsb_index(bb) (__builtin_ctzll(bb))
-#define pop_lsb(bb) ((bb) &= (bb) - 1)
 
 #define move_from_square(move) ((move) >> 10)
 #define move_to_square(move) ((move >> 4 & 0x3f))
@@ -38,5 +37,7 @@ typedef struct Board Board;
 
 typedef uint16_t Move;
 int generate_moves(Board *board, Move moves[MAX_MOVES]);
+
+bool king_in_check(Board *board, ToMove color);
 
 #endif // MOVE_H

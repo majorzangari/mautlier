@@ -3,9 +3,9 @@
 //
 
 #include "move.h"
+#include "bithelpers.h"
 #include "board.h"
 #include "constants.h"
-#include <stdbool.h>
 
 static inline Move encode_move(int from_square, int to_square, int flags) {
   return (from_square << 10) | (to_square << 4) | flags;
@@ -90,14 +90,14 @@ int generate_pawn_captures(Bitboard pawns, Bitboard enemy_occupied, Move *moves,
     int from_square = (color == WHITE) ? to_square - 7 : to_square + 9;
     bool promote = (color == WHITE) ? to_square >= 56 : to_square <= 7;
     if (promote) {
-      *moves++ = encode_move(from_square, to_square,
-                             FLAGS_KNIGHT_PROMOTION | FLAGS_CAPTURE);
-      *moves++ = encode_move(from_square, to_square,
-                             FLAGS_BISHOP_PROMOTION | FLAGS_CAPTURE);
-      *moves++ = encode_move(from_square, to_square,
-                             FLAGS_ROOK_PROMOTION | FLAGS_CAPTURE);
-      *moves++ = encode_move(from_square, to_square,
-                             FLAGS_QUEEN_PROMOTION | FLAGS_CAPTURE);
+      *moves++ =
+          encode_move(from_square, to_square, FLAGS_KNIGHT_PROMOTION_CAPTURE);
+      *moves++ =
+          encode_move(from_square, to_square, FLAGS_BISHOP_PROMOTION_CAPTURE);
+      *moves++ =
+          encode_move(from_square, to_square, FLAGS_ROOK_PROMOTION_CAPTURE);
+      *moves++ =
+          encode_move(from_square, to_square, FLAGS_QUEEN_PROMOTION_CAPTURE);
       num_moves += 4;
     } else {
       *moves++ = encode_move(from_square, to_square, FLAGS_CAPTURE);
@@ -141,7 +141,7 @@ int generate_en_passant(Bitboard pawns, Bitboard ep, ToMove color,
 }
 
 int generate_knight_moves(Bitboard knights, Bitboard same_side_occupied,
-                          Move *moves) {
+                          Bitboard enemy_occupied, Move *moves) {
   int num_moves = 0;
 
   while (knights) {
@@ -154,9 +154,11 @@ int generate_knight_moves(Bitboard knights, Bitboard same_side_occupied,
     while (pseudo_moves) {
       int to_square = lsb_index(pseudo_moves);
       pop_lsb(pseudo_moves);
-      *moves++ =
-          encode_move(index, to_square,
-                      0); // TODO: add other flags (might not be necessary)
+      if (enemy_occupied & (1ULL << to_square)) {
+        *moves++ = encode_move(index, to_square, FLAGS_CAPTURE);
+      } else {
+        *moves++ = encode_move(index, to_square, 0);
+      }
       num_moves++;
     }
   }
@@ -165,7 +167,7 @@ int generate_knight_moves(Bitboard knights, Bitboard same_side_occupied,
 }
 
 int generate_king_moves(Bitboard kings, Bitboard same_side_occupied,
-                        Move *moves) {
+                        Bitboard enemy_occupied, Move *moves) {
   int num_moves = 0;
   while (kings) {
     int index = lsb_index(kings);
@@ -177,7 +179,11 @@ int generate_king_moves(Bitboard kings, Bitboard same_side_occupied,
     while (pseudo_moves) {
       int to_square = lsb_index(pseudo_moves);
       pop_lsb(pseudo_moves);
-      *moves++ = encode_move(index, to_square, 0); // TODO: add other flags
+      if (enemy_occupied & (1ULL << to_square)) {
+        *moves++ = encode_move(index, to_square, FLAGS_CAPTURE);
+      } else {
+        *moves++ = encode_move(index, to_square, 0);
+      }
       num_moves++;
     }
   }
@@ -186,7 +192,8 @@ int generate_king_moves(Bitboard kings, Bitboard same_side_occupied,
 }
 
 int generate_rook_moves(Bitboard rooks, Bitboard occupied,
-                        Bitboard same_side_occupied, Move *moves) {
+                        Bitboard same_side_occupied, Bitboard enemy_occupied,
+                        Move *moves) {
   int num_moves = 0;
 
   while (rooks) {
@@ -198,7 +205,11 @@ int generate_rook_moves(Bitboard rooks, Bitboard occupied,
     while (rook_moves) {
       int to_square = lsb_index(rook_moves);
       pop_lsb(rook_moves);
-      *moves++ = encode_move(index, to_square, 0); // TODO: add other flags
+      if (enemy_occupied & (1ULL << to_square)) {
+        *moves++ = encode_move(index, to_square, FLAGS_CAPTURE);
+      } else {
+        *moves++ = encode_move(index, to_square, 0);
+      }
       num_moves++;
     }
   }
@@ -207,7 +218,8 @@ int generate_rook_moves(Bitboard rooks, Bitboard occupied,
 }
 
 int generate_bishop_moves(Bitboard bishops, Bitboard occupied,
-                          Bitboard same_side_occupied, Move *moves) {
+                          Bitboard same_side_occupied, Bitboard enemy_occupied,
+                          Move *moves) {
   int num_moves = 0;
 
   while (bishops) {
@@ -219,7 +231,11 @@ int generate_bishop_moves(Bitboard bishops, Bitboard occupied,
     while (bishop_moves) {
       int to_square = lsb_index(bishop_moves);
       pop_lsb(bishop_moves);
-      *moves++ = encode_move(index, to_square, 0); // TODO: add other flags
+      if (enemy_occupied & (1ULL << to_square)) {
+        *moves++ = encode_move(index, to_square, FLAGS_CAPTURE);
+      } else {
+        *moves++ = encode_move(index, to_square, 0);
+      }
       num_moves++;
     }
   }
@@ -272,21 +288,71 @@ int generate_moves(Board *board, Move moves[MAX_MOVES]) {
   Bitboard same_side_occupied = board->occupied_by_color[board->to_move];
   Bitboard enemy_side_occupied = board->occupied_by_color[1 - board->to_move];
 
-  move_count += generate_knight_moves(knights, same_side_occupied, moves);
+  move_count += generate_knight_moves(knights, same_side_occupied,
+                                      enemy_side_occupied, moves);
   move_count += generate_pawn_pushes(pawns, board->occupied, moves + move_count,
                                      board->to_move);
   move_count += generate_pawn_captures(pawns, enemy_side_occupied,
                                        moves + move_count, board->to_move);
   move_count += generate_en_passant(pawns, gsd.en_passant, board->to_move,
                                     moves + move_count);
+  move_count += generate_king_moves(kings, same_side_occupied,
+                                    enemy_side_occupied, moves + move_count);
   move_count +=
-      generate_king_moves(kings, same_side_occupied, moves + move_count);
-  move_count += generate_rook_moves(rooks | queens, board->occupied,
-                                    same_side_occupied, moves + move_count);
+      generate_rook_moves(rooks | queens, board->occupied, same_side_occupied,
+                          enemy_side_occupied, moves + move_count);
   move_count += generate_bishop_moves(bishops | queens, board->occupied,
-                                      same_side_occupied, moves + move_count);
+                                      same_side_occupied, enemy_side_occupied,
+                                      moves + move_count);
   move_count += generate_castling(board, moves, gsd);
 
   *(moves + move_count) = (uint16_t)0; // temp TODO: remove
   return move_count;
+}
+
+bool king_in_check(Board *board, ToMove color) {
+  Bitboard same_side_occupied = board->occupied_by_color[color];
+
+  int king_square = lsb_index(board->pieces[color][KING]);
+  int opposite_color = OPPOSITE_COLOR(color);
+
+  Bitboard potential_rook_attacks =
+      get_rook_attack_board(king_square, board->occupied, same_side_occupied);
+  if (potential_rook_attacks & (board->pieces[OPPOSITE_COLOR(color)][ROOK] |
+                                board->pieces[OPPOSITE_COLOR(color)][QUEEN])) {
+    return true;
+  }
+
+  Bitboard potential_bishop_attacks =
+      get_bishop_attack_board(king_square, board->occupied, same_side_occupied);
+  if (potential_bishop_attacks & (board->pieces[opposite_color][BISHOP] |
+                                  board->pieces[opposite_color][QUEEN])) {
+    return true;
+  }
+
+  Bitboard potential_knight_attacks = knight_moves[king_square];
+  if (potential_knight_attacks & board->pieces[opposite_color][KNIGHT]) {
+    return true;
+  }
+
+  Bitboard potential_king_attacks = king_moves[king_square];
+  if (potential_king_attacks & board->pieces[opposite_color][KING]) {
+    return true;
+  }
+
+  Bitboard kings = board->pieces[color][KING];
+
+  Bitboard potential_pawn_attacks =
+      (color == WHITE) ? (kings << 7) & ~FILE_A  // left capture
+                       : (kings >> 9) & ~FILE_A; // right capture
+
+  potential_pawn_attacks |= (color == WHITE)
+                                ? (kings << 9) & ~FILE_H  // right capture
+                                : (kings >> 7) & ~FILE_H; // left capture
+
+  if (potential_pawn_attacks & board->pieces[opposite_color][PAWN]) {
+    return true;
+  }
+
+  return false;
 }

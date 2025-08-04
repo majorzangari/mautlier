@@ -37,4 +37,6 @@
     return stack->data[stack->top];                                            \
   }
 
+// TODO: add way to iterate
+
 #endif

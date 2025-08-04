@@ -16,6 +16,8 @@ typedef uint16_t Move;
 #define WHITE 0
 #define BLACK 1
 
+#define OPPOSITE_COLOR(color) ((color) == WHITE ? BLACK : WHITE)
+
 typedef uint8_t Piece;
 
 #define PAWN 0
@@ -60,11 +62,20 @@ typedef enum {
   BLACK_TO_MOVE = 1,
 } ToMove;
 
-typedef enum {
+// TODO: color and ToMove are different? bad design gotta fix
+
+#define OPPOSITE_TO_MOVE(color) ((color) == WHITE_TO_MOVE ? BLACK_TO_MOVE : WHITE_TO_MOVE
+
+typedef enum { // TODO: could maybe improve performance by leaving checkmates
+               // unknown until checking moves next
   GS_ONGOING,
   GS_WHITE_WON,
   GS_BLACK_WON,
-  GS_DRAW, // TODO: maybe replace with individual draw conditions?
+  GS_DRAW_STALEMATE,
+  GS_DRAW_BY_REPETITION,
+  GS_DRAW_FIFTY_MOVE_RULE,
+  GS_DRAW_INSUFFICIENT_MATERIAL,
+  GS_INVALID,
 } GameState;
 
 typedef uint64_t Bitboard;
@@ -76,6 +87,7 @@ typedef struct GameStateDetails {
   Bitboard en_passant;
   Piece captured_piece; // PIECE_NONE if no piece was captured on that turn (or
                         // current state)
+  uint64_t hash;
 } GameStateDetails;
 
 #define MAX_SAVED_GAMESTATES                                                   \

@@ -11,4 +11,5 @@ uint64_t perft(Board *board, int depth) {
   uint64_t total_nodes = 0;
   Move moves[MAX_MOVES];
   // TODO: finish
+  return 0;
 }
