@@ -2,8 +2,8 @@
 // Created by Major Zangari on 4/19/25.
 //
 
-#ifndef BOARD_H
-#define BOARD_H
+#ifndef MAUTLIER_BOARD_H
+#define MAUTLIER_BOARD_H
 
 #include <stdbool.h>
 #include <stdint.h>

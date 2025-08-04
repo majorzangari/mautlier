@@ -1,3 +1,6 @@
+#ifndef MAUTLIER_HASH_H
+#define MAUTLIER_HASH_H
+
 #include <stdint.h>
 
 #include "board.h"
@@ -52,3 +55,5 @@ uint64_t toggle_castling_rights(uint64_t hash, int castling_rights);
 uint64_t toggle_turn(uint64_t hash);
 
 uint64_t toggle_en_passant(uint64_t hash, int square);
+
+#endif // MAUTLIER_HASH_H
