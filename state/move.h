@@ -2,7 +2,7 @@
 // Created by Major Zangari on 4/20/25.
 //
 #ifndef MAUTLIER_MOVE_H
-#define MAUTLIERMOVE_H
+#define MAUTLIER_MOVE_H
 
 #include "board.h"
 #include <stdbool.h>

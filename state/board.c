@@ -100,7 +100,33 @@ static inline void set_piece_no_hash(Board *board, int square, Piece piece) {
   board->occupied |= (1ULL << square);
 }
 
-static inline void update_gamestate(Board *board) {}
+// checks if board is in a repetition, 50-move rule, or TODO: insufficient
+// material
+static inline bool is_special_draw(Board *board) {
+  ToMove opposite_color = OPPOSITE_COLOR(board->to_move);
+  GameStateDetails curr_state = BOARD_CURR_STATE(board);
+
+  // 50-move rule
+  if (curr_state.halfmove_clock >= 100) {
+    return true;
+  }
+
+  // repetition
+  int identical_states = 1;
+  for (int i = 1; i <= curr_state.halfmove_clock; i++) {
+    GameStateDetails previous_state =
+        GameStateDetailsStack_peek_down(&board->game_state_stack, i);
+    if (previous_state.hash == curr_state.hash) {
+      identical_states++;
+    }
+    if (identical_states >= 3) {
+      return true;
+    }
+  }
+
+  // TODO: insufficient material
+  return false;
+}
 
 static inline void short_castle(Board *board, GameStateDetails *new_state) {
   uint64_t current_hash = new_state->hash;
@@ -284,7 +310,6 @@ void board_make_move(Board *board, Move move) {
     // clang-format on
     break;
   }
-  update_gamestate(board);
   GameStateDetailsStack_push(&board->game_state_stack, new_state);
   board->to_move = OPPOSITE_COLOR(board->to_move);
 }

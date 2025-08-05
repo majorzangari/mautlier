@@ -96,7 +96,6 @@ typedef struct GameStateDetails {
 DEFINE_STACK_TYPE(GameStateDetailsStack, GameStateDetails, MAX_SAVED_GAMESTATES)
 
 typedef struct Board {
-  // GameState game_state;
   Bitboard pieces[2][6];
   Bitboard occupied_by_color[2];
   Bitboard occupied;
