@@ -1,3 +1,6 @@
+#ifndef MAUTLIER_PERFT_H
+#define MAUTLIER_PERFT_H
+
 #include "board.h"
 #include "move.h"
 
@@ -13,3 +16,5 @@ uint64_t perft(Board *board, int depth) {
   // TODO: finish
   return 0;
 }
+
+#endif

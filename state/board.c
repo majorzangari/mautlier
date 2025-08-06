@@ -449,3 +449,61 @@ char *board_to_string(Board *board) {
 
   return buffer;
 }
+
+char *board_to_debug_string(Board *board) {
+  size_t buffer_size = 10000; // TODO: downsize a lot
+  char *buffer = malloc(buffer_size);
+  char *buffer_ptr = buffer;
+
+  buffer_ptr += snprintf(buffer_ptr, buffer_size - (buffer_ptr - buffer),
+                         "White Pawn: %lx\n", board->pieces[WHITE][PAWN]);
+  // clang-format off
+  buffer_ptr += snprintf(buffer_ptr, buffer_size - (buffer_ptr - buffer), "White Knight: %lx\n", board->pieces[WHITE][KNIGHT]);
+  buffer_ptr += snprintf(buffer_ptr, buffer_size - (buffer_ptr - buffer), "White Bishop: %lx\n", board->pieces[WHITE][BISHOP]);
+  buffer_ptr += snprintf(buffer_ptr, buffer_size - (buffer_ptr - buffer), "White Rook: %lx\n", board->pieces[WHITE][ROOK]);
+  buffer_ptr += snprintf(buffer_ptr, buffer_size - (buffer_ptr - buffer), "White Queen: %lx\n", board->pieces[WHITE][QUEEN]);
+  buffer_ptr += snprintf(buffer_ptr, buffer_size - (buffer_ptr - buffer), "White King: %lx\n", board->pieces[WHITE][KING]);
+
+  buffer_ptr += snprintf(buffer_ptr, buffer_size - (buffer_ptr - buffer), "Black Pawn: %lx\n", board->pieces[BLACK][PAWN]);
+  buffer_ptr += snprintf(buffer_ptr, buffer_size - (buffer_ptr - buffer), "Black Knight: %lx\n", board->pieces[BLACK][KNIGHT]);
+  buffer_ptr += snprintf(buffer_ptr, buffer_size - (buffer_ptr - buffer), "Black Bishop: %lx\n", board->pieces[BLACK][BISHOP]);
+  buffer_ptr += snprintf(buffer_ptr, buffer_size - (buffer_ptr - buffer), "Black Rook: %lx\n", board->pieces[BLACK][ROOK]);
+  buffer_ptr += snprintf(buffer_ptr, buffer_size - (buffer_ptr - buffer), "Black Queen: %lx\n", board->pieces[BLACK][QUEEN]);
+  buffer_ptr += snprintf(buffer_ptr, buffer_size - (buffer_ptr - buffer), "Black King: %lx\n", board->pieces[BLACK][KING]);
+  buffer_ptr += snprintf(buffer_ptr, buffer_size - (buffer_ptr - buffer), "\n");
+
+  buffer_ptr += snprintf(buffer_ptr, buffer_size - (buffer_ptr - buffer), "White Occupied: %lx\n", board->occupied_by_color[WHITE]);
+  buffer_ptr += snprintf(buffer_ptr, buffer_size - (buffer_ptr - buffer), "Black Occupied: %lx\n", board->occupied_by_color[BLACK]);
+  buffer_ptr += snprintf(buffer_ptr, buffer_size - (buffer_ptr - buffer), "Occupied: %lx\n", board->occupied);
+
+  buffer_ptr += snprintf(buffer_ptr, buffer_size - (buffer_ptr - buffer),
+                         "To Move: %s\n", board->to_move == WHITE ? "White"
+                                                                  : "Black");
+  
+  buffer_ptr += snprintf(buffer_ptr, buffer_size - (buffer_ptr - buffer), "\n");
+  // clang-format on
+
+  buffer_ptr += snprintf(buffer_ptr, buffer_size - (buffer_ptr - buffer),
+                         "Piece Table:\n");
+  for (int i = 63; i >= 0; i--) {
+    buffer_ptr += snprintf(buffer_ptr, buffer_size - (buffer_ptr - buffer),
+                           "%d ", board->piece_table[i]);
+    if (i % 8 == 0) {
+      buffer_ptr +=
+          snprintf(buffer_ptr, buffer_size - (buffer_ptr - buffer), "\n");
+    }
+  }
+
+  for (int i = 0; i <= board->game_state_stack.top; i++) {
+    GameStateDetails state =
+        GameStateDetailsStack_peek_down(&board->game_state_stack, i);
+    buffer_ptr += snprintf(buffer_ptr, buffer_size - (buffer_ptr - buffer),
+                           "State "
+                           "%d:\nhalfmove_clock: %d\ncastling_rights: %d\nen_"
+                           "passant: %lx\ncaptured_piece: %d\nhash: %lx\n",
+                           i, state.halfmove_clock, state.castling_rights,
+                           state.en_passant, state.captured_piece, state.hash);
+  }
+  *buffer_ptr = '\0';
+  return buffer;
+}

@@ -122,4 +122,6 @@ bool board_black_check(Board *board);
 char *square_to_string(int index);
 char *board_to_string(Board *board);
 
+char *board_to_debug_string(Board *board);
+
 #endif // BOARD_H
