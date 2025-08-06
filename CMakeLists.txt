@@ -9,10 +9,14 @@ add_executable(mautlier
         state/fen.c
         state/move.c
         state/constants.c
+        evaluation/eval.c
+        search/search.c
 )
 
 target_include_directories(mautlier PRIVATE
     ${CMAKE_SOURCE_DIR}/state
     ${CMAKE_SOURCE_DIR}/utils
     ${CMAKE_SOURCE_DIR}/hash
+    ${CMAKE_SOURCE_DIR}/evaluation
+    ${CMAKE_SOURCE_DIR}/search
 )

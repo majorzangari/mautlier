@@ -306,7 +306,6 @@ int generate_moves(Board *board, Move moves[MAX_MOVES]) {
                                       moves + move_count);
   move_count += generate_castling(board, moves, gsd);
 
-  *(moves + move_count) = (uint16_t)0; // temp TODO: remove
   return move_count;
 }
 

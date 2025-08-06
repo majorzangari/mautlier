@@ -1,3 +1,4 @@
+#include "search.h"
 #include "state/board.h"
 #include "state/constants.h"
 #include "state/fen.h"
@@ -16,8 +17,9 @@ int main(void) {
 
   while (1) {
     int moves_number = generate_moves(board, moves);
-    printf("%d moves generated\n", moves_number);
     getchar();
+
+    Move ball = lazy_search(board, 4);
     board_make_move(board, moves[0]);
 
     printf("%s\n", board_to_string(board));

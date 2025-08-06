@@ -119,8 +119,6 @@ void board_update_piece_table(Board *board);
 bool board_white_check(Board *board);
 bool board_black_check(Board *board);
 
-GameState board_check_gamestate(Board *board);
-
 char *square_to_string(int index);
 char *board_to_string(Board *board);
 
