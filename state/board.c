@@ -31,7 +31,7 @@ static inline void move_piece(Board *board, GameStateDetails *state,
 
   Piece previous_piece = board->piece_table[to_square];
   if (flags & FLAGS_CAPTURE) {
-    ToMove captured_color = color == WHITE ? BLACK : WHITE;
+    ToMove captured_color = OPPOSITE_COLOR(color);
     board->pieces[captured_color][previous_piece] &= ~(1ULL << to_square);
     board->occupied_by_color[captured_color] &= ~(1ULL << to_square);
     state->captured_piece = previous_piece;
@@ -131,10 +131,10 @@ static inline bool is_special_draw(Board *board) {
 static inline void short_castle(Board *board, GameStateDetails *new_state) {
   uint64_t current_hash = new_state->hash;
   if (board->to_move == WHITE) {
-    board->pieces[WHITE][KING] |= 0xAULL;
-    board->pieces[WHITE][ROOK] |= 0x5ULL;
-    board->occupied_by_color[WHITE] |= 0xAULL | 0x5ULL;
-    board->occupied |= 0xAULL | 0x5ULL;
+    board->pieces[WHITE][KING] ^= 0xAULL;
+    board->pieces[WHITE][ROOK] ^= 0x5ULL;
+    board->occupied_by_color[WHITE] ^= 0xAULL | 0x5ULL;
+    board->occupied ^= 0xAULL | 0x5ULL;
 
     board->piece_table[0] = PIECE_NONE;
     board->piece_table[1] = KING;
@@ -150,11 +150,11 @@ static inline void short_castle(Board *board, GameStateDetails *new_state) {
 
     new_state->castling_rights &= ~(CR_WHITE_SHORT | CR_WHITE_LONG);
   } else {
-    board->pieces[BLACK][KING] |= 0xA00000000000000ULL;
-    board->pieces[BLACK][ROOK] |= 0x500000000000000ULL;
-    board->occupied_by_color[BLACK] |=
+    board->pieces[BLACK][KING] ^= 0xA00000000000000ULL;
+    board->pieces[BLACK][ROOK] ^= 0x500000000000000ULL;
+    board->occupied_by_color[BLACK] ^=
         0xA00000000000000ULL | 0x500000000000000ULL;
-    board->occupied |= 0xA00000000000000ULL | 0x500000000000000ULL;
+    board->occupied ^= 0xA00000000000000ULL | 0x500000000000000ULL;
 
     board->piece_table[56] = PIECE_NONE;
     board->piece_table[57] = KING;
@@ -175,22 +175,23 @@ static inline void short_castle(Board *board, GameStateDetails *new_state) {
 }
 
 static inline void reverse_short_castle(Board *board) {
-  if (board->to_move == WHITE) {
-    board->pieces[WHITE][KING] |= 0xAULL;
-    board->pieces[WHITE][ROOK] |= 0x5ULL;
-    board->occupied_by_color[WHITE] |= 0xAULL | 0x5ULL;
-    board->occupied |= 0xAULL | 0x5ULL;
+  // reversing white's castle
+  if (board->to_move == BLACK) {
+    board->pieces[WHITE][KING] ^= 0xAULL;
+    board->pieces[WHITE][ROOK] ^= 0x5ULL;
+    board->occupied_by_color[WHITE] ^= 0xAULL | 0x5ULL;
+    board->occupied ^= 0xAULL | 0x5ULL;
 
     board->piece_table[0] = ROOK;
     board->piece_table[1] = PIECE_NONE;
     board->piece_table[2] = PIECE_NONE;
     board->piece_table[3] = KING;
   } else {
-    board->pieces[BLACK][KING] |= 0xA00000000000000ULL;
-    board->pieces[BLACK][ROOK] |= 0x500000000000000ULL;
-    board->occupied_by_color[BLACK] |=
+    board->pieces[BLACK][KING] ^= 0xA00000000000000ULL;
+    board->pieces[BLACK][ROOK] ^= 0x500000000000000ULL;
+    board->occupied_by_color[BLACK] ^=
         0xA00000000000000ULL | 0x500000000000000ULL;
-    board->occupied |= 0xA00000000000000ULL | 0x500000000000000ULL;
+    board->occupied ^= 0xA00000000000000ULL | 0x500000000000000ULL;
 
     board->piece_table[56] = ROOK;
     board->piece_table[57] = PIECE_NONE;
@@ -203,10 +204,10 @@ static inline void long_castle(Board *board, GameStateDetails *new_state) {
   uint64_t current_hash = new_state->hash;
 
   if (board->to_move == WHITE) {
-    board->pieces[WHITE][KING] |= 0x28ULL;
-    board->pieces[WHITE][ROOK] |= 0x90ULL;
-    board->occupied_by_color[WHITE] |= 0x28ULL | 0x90ULL;
-    board->occupied |= 0x28ULL | 0x90ULL;
+    board->pieces[WHITE][KING] ^= 0x28ULL;
+    board->pieces[WHITE][ROOK] ^= 0x90ULL;
+    board->occupied_by_color[WHITE] ^= 0x28ULL | 0x90ULL;
+    board->occupied ^= 0x28ULL | 0x90ULL;
 
     board->piece_table[3] = PIECE_NONE;
     board->piece_table[4] = ROOK;
@@ -222,11 +223,11 @@ static inline void long_castle(Board *board, GameStateDetails *new_state) {
 
     new_state->castling_rights &= ~(CR_WHITE_SHORT | CR_WHITE_LONG);
   } else {
-    board->pieces[BLACK][KING] |= 0x2800000000000000ULL;
-    board->pieces[BLACK][ROOK] |= 0x9000000000000000ULL;
-    board->occupied_by_color[BLACK] |=
+    board->pieces[BLACK][KING] ^= 0x2800000000000000ULL;
+    board->pieces[BLACK][ROOK] ^= 0x9000000000000000ULL;
+    board->occupied_by_color[BLACK] ^=
         0x2800000000000000ULL | 0x9000000000000000ULL;
-    board->occupied |= 0x2800000000000000ULL | 0x9000000000000000ULL;
+    board->occupied ^= 0x2800000000000000ULL | 0x9000000000000000ULL;
 
     board->piece_table[59] = PIECE_NONE;
     board->piece_table[60] = ROOK;
@@ -245,22 +246,23 @@ static inline void long_castle(Board *board, GameStateDetails *new_state) {
 }
 
 static inline void reverse_long_castle(Board *board) {
-  if (board->to_move == WHITE) {
-    board->pieces[WHITE][KING] |= 0x28ULL;
-    board->pieces[WHITE][ROOK] |= 0x90ULL;
-    board->occupied_by_color[WHITE] |= 0x28ULL | 0x90ULL;
-    board->occupied |= 0x28ULL | 0x90ULL;
+  // reversing white's castle
+  if (board->to_move == BLACK) {
+    board->pieces[WHITE][KING] ^= 0x28ULL;
+    board->pieces[WHITE][ROOK] ^= 0x90ULL;
+    board->occupied_by_color[WHITE] ^= 0x28ULL | 0x90ULL;
+    board->occupied ^= 0x28ULL | 0x90ULL;
 
     board->piece_table[3] = KING;
     board->piece_table[4] = PIECE_NONE;
     board->piece_table[5] = PIECE_NONE;
     board->piece_table[7] = ROOK;
   } else {
-    board->pieces[BLACK][KING] |= 0x2800000000000000ULL;
-    board->pieces[BLACK][ROOK] |= 0x9000000000000000ULL;
-    board->occupied_by_color[BLACK] |=
+    board->pieces[BLACK][KING] ^= 0x2800000000000000ULL;
+    board->pieces[BLACK][ROOK] ^= 0x9000000000000000ULL;
+    board->occupied_by_color[BLACK] ^=
         0x2800000000000000ULL | 0x9000000000000000ULL;
-    board->occupied |= 0x2800000000000000ULL | 0x9000000000000000ULL;
+    board->occupied ^= 0x2800000000000000ULL | 0x9000000000000000ULL;
 
     board->piece_table[59] = KING;
     board->piece_table[60] = PIECE_NONE;
@@ -282,10 +284,6 @@ void board_make_move(Board *board, Move move) {
   new_state.hash = toggle_turn(BOARD_CURR_STATE(board).hash);
 
   switch (flags) {
-  case FLAGS_PAWN_PUSH:
-    move_piece(board, &new_state, from_square, to_square, flags);
-    new_state.halfmove_clock = 0;
-    break;
   case FLAGS_DOUBLE_PUSH:
     move_piece(board, &new_state, from_square, to_square, flags);
     new_state.halfmove_clock = 0;
@@ -298,15 +296,20 @@ void board_make_move(Board *board, Move move) {
     short_castle(board, &new_state);
     break;
   case FLAGS_LONG_CASTLE:
-    short_castle(board, &new_state);
+    long_castle(board, &new_state);
     break;
   default:
+    if (flags & FLAGS_PAWN_PUSH) {
+      new_state.halfmove_clock = 0;
+    }
     move_piece(board, &new_state, from_square, to_square, flags);
+    // TODO: kill stupid logic
+
     // clang-format off
-    if (flags & FLAGS_KNIGHT_PROMOTION) { set_piece(board, &new_state, to_square, KNIGHT); }
-    if (flags & FLAGS_BISHOP_PROMOTION) { set_piece(board, &new_state, to_square, BISHOP); }
-    if (flags & FLAGS_ROOK_PROMOTION) { set_piece(board, &new_state, to_square, ROOK); }
-    if (flags & FLAGS_QUEEN_PROMOTION) { set_piece(board, &new_state, to_square, QUEEN); }
+    if (flags == FLAGS_KNIGHT_PROMOTION || flags == FLAGS_KNIGHT_PROMOTION_CAPTURE) { set_piece(board, &new_state, to_square, KNIGHT); }
+    if (flags == FLAGS_BISHOP_PROMOTION || flags == FLAGS_BISHOP_PROMOTION_CAPTURE) { set_piece(board, &new_state, to_square, BISHOP); }
+    if (flags == FLAGS_ROOK_PROMOTION   || flags == FLAGS_ROOK_PROMOTION_CAPTURE) { set_piece(board, &new_state, to_square, ROOK); }
+    if (flags == FLAGS_QUEEN_PROMOTION  || flags == FLAGS_QUEEN_PROMOTION_CAPTURE) { set_piece(board, &new_state, to_square, QUEEN); }
     // clang-format on
     break;
   }
@@ -334,6 +337,14 @@ void board_unmake_move(Board *board, Move move) {
       ToMove color = OPPOSITE_COLOR(board->to_move);
       set_piece_no_hash(board, to_square, captured_piece);
     }
+
+    // clang-format off
+    if (flags == FLAGS_KNIGHT_PROMOTION | flags == FLAGS_KNIGHT_PROMOTION_CAPTURE) { set_piece_no_hash(board, from_square, PAWN); }
+    if (flags == FLAGS_BISHOP_PROMOTION | flags == FLAGS_BISHOP_PROMOTION_CAPTURE) { set_piece_no_hash(board, from_square, PAWN); }
+    if (flags == FLAGS_ROOK_PROMOTION   | flags == FLAGS_ROOK_PROMOTION_CAPTURE) { set_piece_no_hash(board, from_square, PAWN); }
+    if (flags == FLAGS_QUEEN_PROMOTION  | flags == FLAGS_QUEEN_PROMOTION_CAPTURE) { set_piece_no_hash(board, from_square, PAWN); }
+    // clang-format on
+
     break;
   }
   board->to_move = OPPOSITE_COLOR(board->to_move);
@@ -344,12 +355,16 @@ bool board_valid(Board *board) {
   for (int color = 0; color < 2; color++) {
     for (int piece = 0; piece < 6; piece++) {
       if (all_pieces & board->pieces[color][piece]) {
+        printf("Duplicate piece found: color %d, piece %d\n", color, piece);
         return false;
       }
       all_pieces |= board->pieces[color][piece];
     }
   }
   if (all_pieces != board->occupied) {
+    printf("Occupied bitboard does not match pieces bitboards: all_pieces:%lx, "
+           "occupied:%lx.\n",
+           all_pieces, board->occupied);
     return false;
   }
   return true;
@@ -384,126 +399,4 @@ void board_update_piece_table(Board *board) {
       }
     }
   }
-}
-
-char *square_to_string(int index) {
-  char *out = malloc(3);
-  out[0] = 'a' + (index % 8);
-  out[1] = '1' + (index / 8);
-  out[2] = '\0';
-  return out;
-}
-
-char piece_char_at(Board *board, int rank, int file) {
-  uint64_t square_bit = 1ULL << (rank * 8 + file);
-
-  // clang-format off
-  if (board->pieces[0][0] & square_bit) return 'P';
-  if (board->pieces[0][1] & square_bit) return 'N';
-  if (board->pieces[0][2] & square_bit) return 'B';
-  if (board->pieces[0][3] & square_bit) return 'R';
-  if (board->pieces[0][4] & square_bit) return 'Q';
-  if (board->pieces[0][5] & square_bit) return 'K';
-  if (board->pieces[1][0] & square_bit) return 'p';
-  if (board->pieces[1][1] & square_bit) return 'n';
-  if (board->pieces[1][2] & square_bit) return 'b';
-  if (board->pieces[1][3] & square_bit) return 'r';
-  if (board->pieces[1][4] & square_bit) return 'q';
-  if (board->pieces[1][5] & square_bit) return 'k';
-  // clang-format on
-  return ' ';
-}
-
-#define BOARD_SIDE "+---+---+---+---+---+---+---+---+"
-#define FILE_LABELS "  a   b   c   d   e   f   g   h  "
-
-// Board output format stolen from stockfish (mine was ugly)
-char *board_to_string(Board *board) {
-  if (!board_valid(board)) {
-    return "Invalid Board";
-  }
-  size_t buffer_size = 750;
-  char *buffer = malloc(buffer_size);
-  char *buffer_ptr = buffer;
-
-  buffer_ptr += snprintf(buffer_ptr, buffer_size - (buffer_ptr - buffer),
-                         "%s\n", BOARD_SIDE);
-
-  for (int rank = 7; rank >= 0; rank--) {
-    for (int file = 7; file >= 0; file--) {
-      buffer_ptr += snprintf(buffer_ptr, buffer_size - (buffer_ptr - buffer),
-                             "| %c ", piece_char_at(board, rank, file));
-    }
-
-    buffer_ptr += snprintf(buffer_ptr, buffer_size - (buffer_ptr - buffer),
-                           "| %d\n%s\n", rank + 1, BOARD_SIDE);
-  }
-  buffer_ptr += snprintf(buffer_ptr, buffer_size - (buffer_ptr - buffer),
-                         "%s\n", FILE_LABELS);
-
-  char *board_fen = board_to_fen(board);
-  buffer_ptr += snprintf(buffer_ptr, buffer_size - (buffer_ptr - buffer),
-                         "\nFen: %s", board_fen);
-  free(board_fen);
-  *buffer_ptr = '\0';
-
-  return buffer;
-}
-
-char *board_to_debug_string(Board *board) {
-  size_t buffer_size = 10000; // TODO: downsize a lot
-  char *buffer = malloc(buffer_size);
-  char *buffer_ptr = buffer;
-
-  buffer_ptr += snprintf(buffer_ptr, buffer_size - (buffer_ptr - buffer),
-                         "White Pawn: %lx\n", board->pieces[WHITE][PAWN]);
-  // clang-format off
-  buffer_ptr += snprintf(buffer_ptr, buffer_size - (buffer_ptr - buffer), "White Knight: %lx\n", board->pieces[WHITE][KNIGHT]);
-  buffer_ptr += snprintf(buffer_ptr, buffer_size - (buffer_ptr - buffer), "White Bishop: %lx\n", board->pieces[WHITE][BISHOP]);
-  buffer_ptr += snprintf(buffer_ptr, buffer_size - (buffer_ptr - buffer), "White Rook: %lx\n", board->pieces[WHITE][ROOK]);
-  buffer_ptr += snprintf(buffer_ptr, buffer_size - (buffer_ptr - buffer), "White Queen: %lx\n", board->pieces[WHITE][QUEEN]);
-  buffer_ptr += snprintf(buffer_ptr, buffer_size - (buffer_ptr - buffer), "White King: %lx\n", board->pieces[WHITE][KING]);
-
-  buffer_ptr += snprintf(buffer_ptr, buffer_size - (buffer_ptr - buffer), "Black Pawn: %lx\n", board->pieces[BLACK][PAWN]);
-  buffer_ptr += snprintf(buffer_ptr, buffer_size - (buffer_ptr - buffer), "Black Knight: %lx\n", board->pieces[BLACK][KNIGHT]);
-  buffer_ptr += snprintf(buffer_ptr, buffer_size - (buffer_ptr - buffer), "Black Bishop: %lx\n", board->pieces[BLACK][BISHOP]);
-  buffer_ptr += snprintf(buffer_ptr, buffer_size - (buffer_ptr - buffer), "Black Rook: %lx\n", board->pieces[BLACK][ROOK]);
-  buffer_ptr += snprintf(buffer_ptr, buffer_size - (buffer_ptr - buffer), "Black Queen: %lx\n", board->pieces[BLACK][QUEEN]);
-  buffer_ptr += snprintf(buffer_ptr, buffer_size - (buffer_ptr - buffer), "Black King: %lx\n", board->pieces[BLACK][KING]);
-  buffer_ptr += snprintf(buffer_ptr, buffer_size - (buffer_ptr - buffer), "\n");
-
-  buffer_ptr += snprintf(buffer_ptr, buffer_size - (buffer_ptr - buffer), "White Occupied: %lx\n", board->occupied_by_color[WHITE]);
-  buffer_ptr += snprintf(buffer_ptr, buffer_size - (buffer_ptr - buffer), "Black Occupied: %lx\n", board->occupied_by_color[BLACK]);
-  buffer_ptr += snprintf(buffer_ptr, buffer_size - (buffer_ptr - buffer), "Occupied: %lx\n", board->occupied);
-
-  buffer_ptr += snprintf(buffer_ptr, buffer_size - (buffer_ptr - buffer),
-                         "To Move: %s\n", board->to_move == WHITE ? "White"
-                                                                  : "Black");
-  
-  buffer_ptr += snprintf(buffer_ptr, buffer_size - (buffer_ptr - buffer), "\n");
-  // clang-format on
-
-  buffer_ptr += snprintf(buffer_ptr, buffer_size - (buffer_ptr - buffer),
-                         "Piece Table:\n");
-  for (int i = 63; i >= 0; i--) {
-    buffer_ptr += snprintf(buffer_ptr, buffer_size - (buffer_ptr - buffer),
-                           "%d ", board->piece_table[i]);
-    if (i % 8 == 0) {
-      buffer_ptr +=
-          snprintf(buffer_ptr, buffer_size - (buffer_ptr - buffer), "\n");
-    }
-  }
-
-  for (int i = 0; i <= board->game_state_stack.top; i++) {
-    GameStateDetails state =
-        GameStateDetailsStack_peek_down(&board->game_state_stack, i);
-    buffer_ptr += snprintf(buffer_ptr, buffer_size - (buffer_ptr - buffer),
-                           "State "
-                           "%d:\nhalfmove_clock: %d\ncastling_rights: %d\nen_"
-                           "passant: %lx\ncaptured_piece: %d\nhash: %lx\n",
-                           i, state.halfmove_clock, state.castling_rights,
-                           state.en_passant, state.captured_piece, state.hash);
-  }
-  *buffer_ptr = '\0';
-  return buffer;
 }

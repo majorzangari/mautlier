@@ -1,4 +1,5 @@
 #include "search.h"
+#include "diagnostic_tools.h"
 #include "eval.h"
 #include "misc.h"
 
@@ -49,6 +50,7 @@ Move lazy_search(Board *board, int depth) {
 
   for (int i = 0; i < num_moves; i++) {
     board_make_move(board, moves[i]);
+    printf("%s\n", board_to_string(board));
     if (king_in_check(board, board->to_move)) {
       board_unmake_move(board, moves[i]);
       continue;

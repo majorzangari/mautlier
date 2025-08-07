@@ -11,6 +11,7 @@ add_executable(mautlier
         state/constants.c
         evaluation/eval.c
         search/search.c
+        utils/diagnostic_tools.c
 )
 
 target_include_directories(mautlier PRIVATE

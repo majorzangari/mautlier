@@ -3,6 +3,7 @@
 //
 
 #include "fen.h"
+#include "diagnostic_tools.h"
 #include "hash.c"
 
 #include <stddef.h>
@@ -44,7 +45,6 @@ void populate_pieces(uint64_t pieces[2][6], char *pieces_data) {
         case 'r': pieces[BLACK][3] |= square_bit; break;
         case 'q': pieces[BLACK][4] |= square_bit; break;
         case 'k': pieces[BLACK][5] |= square_bit; break;
-        default: break;
       }
       // clang-format on
       file--;
@@ -104,8 +104,12 @@ uint8_t parse_castling_rights(char *castling_rights_data) {
   return out;
 }
 
-Board *fen_to_board(char *fen) {
-  Board *out = malloc(sizeof(Board));
+Board *fen_to_board(char *input_fen) {
+  char fen[100];
+  strcpy(fen, input_fen); // slow ig but helps outside a lot
+
+  Board *out = calloc(1, sizeof(Board));
+
   char *saveptr;
 
   char *pieces_data = strtok_r(fen, " ", &saveptr);
@@ -174,6 +178,7 @@ char *board_to_fen(Board *board) {
         }
         index +=
             snprintf(out + index, buffer_size - index, "%d", empty_squares);
+        file++;
       }
     }
     if (rank != 0)

@@ -119,9 +119,7 @@ void board_update_piece_table(Board *board);
 bool board_white_check(Board *board);
 bool board_black_check(Board *board);
 
-char *square_to_string(int index);
-char *board_to_string(Board *board);
-
-char *board_to_debug_string(Board *board);
+// checks if board represents a valid state TODO: finish checking everything
+bool board_valid(Board *board);
 
 #endif // BOARD_H
