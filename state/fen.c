@@ -3,6 +3,7 @@
 //
 
 #include "fen.h"
+#include "debug_printer.h"
 #include "diagnostic_tools.h"
 #include "hash.c"
 
@@ -105,6 +106,7 @@ uint8_t parse_castling_rights(char *castling_rights_data) {
 }
 
 Board *fen_to_board(char *input_fen) {
+  DP_PRINTF("FUNC_TRACE", "fen_to_board\n");
   char fen[100];
   strcpy(fen, input_fen); // slow ig but helps outside a lot
 
@@ -146,6 +148,7 @@ Board *fen_to_board(char *input_fen) {
 }
 
 char *board_to_fen(Board *board) {
+  DP_PRINTF("FUNC_TRACE", "board_to_fen\n");
   size_t buffer_size = 95;
   char *out = malloc(buffer_size);
   int index = 0;

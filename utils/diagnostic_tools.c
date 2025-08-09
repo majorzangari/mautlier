@@ -138,6 +138,7 @@ void set_errorf(char *msg, ...) {
 }
 
 bool compare_boards(Board *board1, Board *board2) {
+
   // Piece bitboards
   for (ToMove color = WHITE; color <= BLACK; color++) {
     for (Piece piece = PAWN; piece <= KING; piece++) {
@@ -179,7 +180,7 @@ bool compare_boards(Board *board1, Board *board2) {
   // Piece tables
   for (int i = 63; i >= 0; i--) {
     if (board1->piece_table[i] != board2->piece_table[i]) {
-      char comp_string[256];
+      char comp_string[512];
       int index = 0;
       for (int j = 7; j >= 0; j--) {
         for (int k = 7; k >= 0; k--) {
@@ -193,9 +194,9 @@ bool compare_boards(Board *board1, Board *board2) {
         }
         comp_string[index++] = '\n';
       }
+      comp_string[index] = '\0';
 
-      set_errorf("Piece table differ at index %d:\n%s", i,
-                 board1->piece_table[i], board2->piece_table[i], comp_string);
+      set_errorf("Piece table differ at index %d:\n%s", i, comp_string);
       return false;
     }
   }

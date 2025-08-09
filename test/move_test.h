@@ -6,13 +6,37 @@
 #include "fen.h"
 #include "move.h"
 
+#include <stdarg.h>
 #include <stdbool.h>
 #include <stdlib.h>
 #include <string.h>
 
+// TODO: fix exit shenanigans
+
+void check_invalid(Board *board, const char *context, ...) { // TODO: fix hacks
+  if (!board_valid(board)) {
+    va_list args;
+    va_start(args, context);
+    char buffer[256];
+    vsnprintf(buffer, sizeof(buffer), context, args);
+
+    fprintf(stderr, "Invalid board detected: %s\n", buffer);
+    fprintf(stderr, "Board: %s\n", board_to_debug_string(board));
+    exit(1);
+  }
+}
+
+void check_compare(Board *a, Board *b, const char *context) {
+  if (!compare_boards(a, b)) {
+    fprintf(stderr, "Board comparison failed: %s\n", context);
+    fprintf(stderr, "Board diff: %s\n", last_board_compare_diff());
+    exit(1);
+  }
+}
+
 // tests all available moves at the give position to make sure board is
 // equivalent after making and unmaking the move
-bool test_move_making(char *pos) {
+void test_move_making(char *pos) {
   Board *board = fen_to_board(pos);
   Move moves[MAX_MOVES];
 
@@ -21,61 +45,34 @@ bool test_move_making(char *pos) {
     Board *board_copy = malloc(sizeof(Board));
     memcpy(board_copy, board, sizeof(Board));
 
-    if (!board_valid(board_copy)) {
-      fprintf(stderr, "Invalid board before making move %d: %hu\n", i,
-              moves[i]);
-      fprintf(stderr, "Board: %s\n", board_to_debug_string(board));
-      free(board_copy);
-      free(board);
-      return false;
-    }
+    check_invalid(board, "before making move %s", move_to_string(moves[i]));
 
     board_make_move(board, moves[i]);
-    if (!board_valid(board)) {
-      fprintf(stderr, "Invalid board after making move %d: %hu\n", i, moves[i]);
-      fprintf(stderr, "Board: %s\n", board_to_debug_string(board));
-      free(board_copy);
-      free(board);
-      return false;
-    }
+
+    check_invalid(board, "after making move %s", move_to_string(moves[i]));
     board_unmake_move(board, moves[i]);
+    check_invalid(board, "after unmaking move %s", move_to_string(moves[i]));
 
-    if (!board_valid(board)) {
-      fprintf(stderr, "Invalid board after unmaking move %d: %s\n", i,
-              move_to_string(moves[i]));
-      free(board_copy);
-      free(board);
-      return false;
-    }
-
-    if (!compare_boards(board, board_copy)) {
-      fprintf(stderr, "Move test failed for move %d: %hu\n", i, moves[i]);
-      fprintf(stderr, "Board diff: %s\n", last_board_compare_diff());
-      free(board_copy);
-      free(board);
-      return false;
-    }
+    check_compare(board, board_copy, "after unmaking move comparison");
+    free(board_copy);
   }
 
   free(board);
-  return true;
 }
 
 bool make_unmake_suite() {
   // clang-format off
-  char positions[5][256] = {
+  char positions[][256] = {
       "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",      // simple position
       "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR b KQkq - 0 1",      // simple black position
       "r3k2r/pppppppp/8/8/8/8/PPPPPPPP/R3K2R w KQkq - 0 1",            // castling shenanigans
       "r3k2r/pppppppp/8/8/8/8/PPPPPPPP/R3K2R b KQkq - 0 1",            // black castling shenanigans
       "rnbqkbnr/pppp1ppp/4p3/8/6P1/5P2/PPPPP2P/RNBQKBNR b KQkq - 0 2", // checkmate available
+      "r1bqkb1r/2p1ppp1/p1p5/3p4/4P3/2PP1Q2/P1P2PPP/R1B1K1NR b KkQq - 1 0"
   };
   // clang-format on
   for (size_t i = 0; i < (sizeof(positions) / sizeof(positions[0])); i++) {
-    if (!test_move_making(positions[i])) {
-      fprintf(stderr, "Move test failed for position: %s\n", positions[i]);
-      return false;
-    }
+    test_move_making(positions[i]);
   }
 
   return true;

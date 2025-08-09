@@ -28,5 +28,6 @@ int lazy_evaluation(Board *board) {
   out += LAZY_EVAL_ROOK * rook_diff;
   out += LAZY_EVAL_QUEEN * queen_diff;
 
+  // printf("Lazy eval: %d\n", out);
   return out;
 }

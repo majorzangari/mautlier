@@ -6,6 +6,8 @@
 #include "bithelpers.h"
 #include "board.h"
 #include "constants.h"
+#include "debug_printer.h"
+#include <stdlib.h>
 
 static inline Move encode_move(int from_square, int to_square, int flags) {
   return (from_square << 10) | (to_square << 4) | flags;
@@ -13,6 +15,7 @@ static inline Move encode_move(int from_square, int to_square, int flags) {
 
 int generate_pawn_pushes(Bitboard pawns, Bitboard occupied, Move *moves,
                          ToMove color) {
+  DP_PRINTF("FUNC_TRACE", "generate_pawn_pushes\n");
   int num_moves = 0;
 
   Bitboard empty = ~occupied;
@@ -56,6 +59,7 @@ int generate_pawn_pushes(Bitboard pawns, Bitboard occupied, Move *moves,
 
 int generate_pawn_captures(Bitboard pawns, Bitboard enemy_occupied, Move *moves,
                            ToMove color) {
+  DP_PRINTF("FUNC_TRACE", "generate_pawn_captures\n");
   int num_moves = 0;
 
   Bitboard left_capture = (color == WHITE)
@@ -110,6 +114,7 @@ int generate_pawn_captures(Bitboard pawns, Bitboard enemy_occupied, Move *moves,
 
 int generate_en_passant(Bitboard pawns, Bitboard ep, ToMove color,
                         Move *moves) {
+  DP_PRINTF("FUNC_TRACE", "generate_en_passant\n");
   if (!ep)
     return 0;
 
@@ -141,6 +146,7 @@ int generate_en_passant(Bitboard pawns, Bitboard ep, ToMove color,
 
 int generate_knight_moves(Bitboard knights, Bitboard same_side_occupied,
                           Bitboard enemy_occupied, Move *moves) {
+  DP_PRINTF("FUNC_TRACE", "generate_knight_moves\n");
   int num_moves = 0;
 
   while (knights) {
@@ -167,6 +173,7 @@ int generate_knight_moves(Bitboard knights, Bitboard same_side_occupied,
 
 int generate_king_moves(Bitboard kings, Bitboard same_side_occupied,
                         Bitboard enemy_occupied, Move *moves) {
+  DP_PRINTF("FUNC_TRACE", "generate_king_moves\n");
   int num_moves = 0;
   while (kings) {
     int index = lsb_index(kings);
@@ -193,6 +200,7 @@ int generate_king_moves(Bitboard kings, Bitboard same_side_occupied,
 int generate_rook_moves(Bitboard rooks, Bitboard occupied,
                         Bitboard same_side_occupied, Bitboard enemy_occupied,
                         Move *moves) {
+  DP_PRINTF("FUNC_TRACE", "generate_rook_moves\n");
   int num_moves = 0;
 
   while (rooks) {
@@ -219,6 +227,7 @@ int generate_rook_moves(Bitboard rooks, Bitboard occupied,
 int generate_bishop_moves(Bitboard bishops, Bitboard occupied,
                           Bitboard same_side_occupied, Bitboard enemy_occupied,
                           Move *moves) {
+  DP_PRINTF("FUNC_TRACE", "generate_bishop_moves\n");
   int num_moves = 0;
 
   while (bishops) {
@@ -243,6 +252,7 @@ int generate_bishop_moves(Bitboard bishops, Bitboard occupied,
 }
 
 int generate_castling(Board *board, Move *moves, GameStateDetails details) {
+  DP_PRINTF("FUNC_TRACE", "generate_castling\n");
   bool short_available = (board->to_move == WHITE)
                              ? (details.castling_rights & CR_WHITE_SHORT)
                              : (details.castling_rights & CR_BLACK_SHORT);
@@ -274,6 +284,7 @@ int generate_castling(Board *board, Move *moves, GameStateDetails details) {
 }
 
 int generate_moves(Board *board, Move moves[MAX_MOVES]) {
+  DP_PRINTF("FUNC_TRACE", "generate_moves\n");
   int move_count = 0;
 
   GameStateDetails gsd = BOARD_CURR_STATE(board);
@@ -308,11 +319,16 @@ int generate_moves(Board *board, Move moves[MAX_MOVES]) {
 }
 
 bool king_in_check(Board *board, ToMove color) {
+  DP_PRINTF("FUNC_TRACE", "king_in_check\n");
   Bitboard same_side_occupied = board->occupied_by_color[color];
 
   int king_square = lsb_index(board->pieces[color][KING]);
-  int opposite_color = OPPOSITE_COLOR(color);
+  if (king_square == 64) { // TODO: handle lmao
+    printf("No king found!\n");
+    exit(1);
+  }
 
+  ToMove opposite_color = OPPOSITE_COLOR(color);
   Bitboard potential_rook_attacks =
       get_rook_attack_board(king_square, board->occupied, same_side_occupied);
   if (potential_rook_attacks & (board->pieces[OPPOSITE_COLOR(color)][ROOK] |
@@ -350,7 +366,6 @@ bool king_in_check(Board *board, ToMove color) {
   if (potential_pawn_attacks & board->pieces[opposite_color][PAWN]) {
     return true;
   }
-
   return false;
 }
 
@@ -360,9 +375,9 @@ char *move_to_string(Move move) {
   int to_square = move_to_square(move);
   int flags = move_flags(move);
 
-  snprintf(buffer, sizeof(buffer), "%c%c-%c%c", 'a' + (from_square % 8),
-           '1' + (from_square / 8), 'a' + (to_square % 8),
-           '1' + (to_square / 8));
+  snprintf(buffer, sizeof(buffer), "%c%c-%c%c, %d", 'h' - (from_square % 8),
+           '1' + (from_square / 8), 'h' - (to_square % 8),
+           '1' + (to_square / 8), flags);
 
   return buffer;
 }

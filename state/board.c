@@ -4,6 +4,7 @@
 
 #include "board.h"
 #include "bithelpers.h"
+#include "debug_printer.h"
 #include "fen.h"
 #include "hash.h"
 #include "move.h"
@@ -17,11 +18,54 @@ Board *init_default_board() {
       "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1");
 }
 
+static inline void check_rook_castling_right_change(Board *board,
+                                                    GameStateDetails *state,
+                                                    uint8_t square) {
+  if (square == 0) {
+    state->castling_rights &= ~CR_WHITE_SHORT;
+    state->hash = toggle_castling_rights(state->hash, ZOBRIST_CR_WHITE_SHORT);
+  } else if (square == 7) {
+    state->castling_rights &= ~CR_WHITE_LONG;
+    state->hash = toggle_castling_rights(state->hash, ZOBRIST_CR_WHITE_LONG);
+  } else if (square == 56) {
+    state->castling_rights &= ~CR_BLACK_SHORT;
+    state->hash = toggle_castling_rights(state->hash, ZOBRIST_CR_BLACK_SHORT);
+  } else if (square == 63) {
+    state->castling_rights &= ~CR_BLACK_LONG;
+    state->hash = toggle_castling_rights(state->hash, ZOBRIST_CR_BLACK_LONG);
+  }
+}
+
+// TODO: bloat?
+static inline void manage_move_castling_rights(Board *board,
+                                               GameStateDetails *state,
+                                               uint8_t from_square) {
+  Piece piece = board->piece_table[from_square];
+  ToMove color = board->to_move;
+
+  if (piece == ROOK) {
+    check_rook_castling_right_change(board, state, from_square);
+  } else if (piece == KING) {
+    if (color == WHITE) {
+      state->castling_rights &= ~(CR_WHITE_SHORT | CR_WHITE_LONG);
+      state->hash = toggle_castling_rights(state->hash, ZOBRIST_CR_WHITE_SHORT);
+      state->hash = toggle_castling_rights(state->hash, ZOBRIST_CR_WHITE_LONG);
+    } else {
+      state->castling_rights &= ~(CR_BLACK_SHORT | CR_BLACK_LONG);
+      state->hash = toggle_castling_rights(state->hash, ZOBRIST_CR_BLACK_SHORT);
+      state->hash = toggle_castling_rights(state->hash, ZOBRIST_CR_BLACK_LONG);
+    }
+  }
+}
+
 static inline void move_piece(Board *board, GameStateDetails *state,
                               uint8_t from_square, uint8_t to_square,
                               uint8_t flags) {
   Piece piece = board->piece_table[from_square];
   ToMove color = board->to_move;
+
+  manage_move_castling_rights(board, state, from_square);
+
   board->pieces[color][piece] &= ~(1ULL << from_square);
   board->pieces[color][piece] |= (1ULL << to_square);
   board->occupied_by_color[color] &= ~(1ULL << from_square);
@@ -38,6 +82,9 @@ static inline void move_piece(Board *board, GameStateDetails *state,
     state->halfmove_clock = 0;
     state->hash =
         toggle_piece(state->hash, previous_piece, to_square, captured_color);
+    if (previous_piece == ROOK) {
+      check_rook_castling_right_change(board, state, to_square);
+    }
   }
   board->piece_table[to_square] = piece;
   board->piece_table[from_square] = PIECE_NONE;
@@ -47,10 +94,11 @@ static inline void move_piece(Board *board, GameStateDetails *state,
 
 // SHOULD BE USED AFTER POPPING THE STATE
 static inline void undo_move_piece(Board *board, uint8_t to_square,
-                                   uint8_t from_square, uint8_t flags) {
+                                   uint8_t from_square, uint8_t flags,
+                                   Piece previous_piece) {
   Piece piece = board->piece_table[to_square];
-  Piece previous_piece = BOARD_CURR_STATE(board).captured_piece;
   ToMove color = OPPOSITE_COLOR(board->to_move);
+
   board->pieces[color][piece] &= ~(1ULL << to_square);
   board->pieces[color][piece] |= (1ULL << from_square);
   board->occupied_by_color[color] &= ~(1ULL << to_square);
@@ -69,15 +117,15 @@ static inline void undo_move_piece(Board *board, uint8_t to_square,
   board->piece_table[from_square] = piece;
 }
 
-// does not set captured piece
+// CAN NOT BE USED FOR CAPTURES
 static inline void set_piece(Board *board, GameStateDetails *state, int square,
                              Piece piece) {
   ToMove color = board->to_move;
   Piece previous_piece = board->piece_table[square];
   if (previous_piece != PIECE_NONE) {
-    board->pieces[OPPOSITE_COLOR(color)][previous_piece] &= ~(1ULL << square);
+    board->pieces[color][previous_piece] &= ~(1ULL << square);
     state->hash = toggle_piece(state->hash, previous_piece, square, color);
-    board->occupied_by_color[OPPOSITE_COLOR(color)] &= ~(1ULL << square);
+    board->occupied_by_color[color] &= ~(1ULL << square);
   }
   board->pieces[color][piece] |= (1ULL << square);
   board->piece_table[square] = piece;
@@ -273,6 +321,7 @@ static inline void reverse_long_castle(Board *board) {
 
 // TODO: check capture flag instead of piece board
 void board_make_move(Board *board, Move move) {
+  DP_PRINTF("FUNC_TRACE", "board_make_move\n");
   uint8_t from_square = move_from_square(move);
   uint8_t to_square = move_to_square(move);
   uint8_t flags = move_flags(move);
@@ -284,6 +333,10 @@ void board_make_move(Board *board, Move move) {
   new_state.hash = toggle_turn(BOARD_CURR_STATE(board).hash);
 
   switch (flags) {
+  case FLAGS_PAWN_PUSH:
+    move_piece(board, &new_state, from_square, to_square, flags);
+    new_state.halfmove_clock = 0;
+    break;
   case FLAGS_DOUBLE_PUSH:
     move_piece(board, &new_state, from_square, to_square, flags);
     new_state.halfmove_clock = 0;
@@ -298,18 +351,18 @@ void board_make_move(Board *board, Move move) {
   case FLAGS_LONG_CASTLE:
     long_castle(board, &new_state);
     break;
+  case FLAGS_EN_PASSANT: // why is this a case? TODO: figure out
+    move_piece(board, &new_state, from_square, to_square, FLAGS_CAPTURE);
+    break;
   default:
-    if (flags & FLAGS_PAWN_PUSH) {
-      new_state.halfmove_clock = 0;
-    }
     move_piece(board, &new_state, from_square, to_square, flags);
     // TODO: kill stupid logic
 
     // clang-format off
-    if (flags == FLAGS_KNIGHT_PROMOTION || flags == FLAGS_KNIGHT_PROMOTION_CAPTURE) { set_piece(board, &new_state, to_square, KNIGHT); }
-    if (flags == FLAGS_BISHOP_PROMOTION || flags == FLAGS_BISHOP_PROMOTION_CAPTURE) { set_piece(board, &new_state, to_square, BISHOP); }
-    if (flags == FLAGS_ROOK_PROMOTION   || flags == FLAGS_ROOK_PROMOTION_CAPTURE) { set_piece(board, &new_state, to_square, ROOK); }
-    if (flags == FLAGS_QUEEN_PROMOTION  || flags == FLAGS_QUEEN_PROMOTION_CAPTURE) { set_piece(board, &new_state, to_square, QUEEN); }
+    if (flags & FLAGS_KNIGHT_PROMOTION) { set_piece(board, &new_state, to_square, KNIGHT); }
+    if (flags & FLAGS_BISHOP_PROMOTION) { set_piece(board, &new_state, to_square, BISHOP); }
+    if (flags & FLAGS_ROOK_PROMOTION) { set_piece(board, &new_state, to_square, ROOK); }
+    if (flags & FLAGS_QUEEN_PROMOTION) { set_piece(board, &new_state, to_square, QUEEN); }
     // clang-format on
     break;
   }
@@ -318,6 +371,7 @@ void board_make_move(Board *board, Move move) {
 }
 
 void board_unmake_move(Board *board, Move move) {
+  DP_PRINTF("FUNC_TRACE", "board_unmake_move\n");
   Piece captured_piece =
       GameStateDetailsStack_pop(&board->game_state_stack).captured_piece;
   uint8_t from_square = move_from_square(move);
@@ -325,6 +379,11 @@ void board_unmake_move(Board *board, Move move) {
   uint8_t flags = move_flags(move);
 
   switch (flags) {
+  case FLAGS_PAWN_PUSH:
+  case FLAGS_DOUBLE_PUSH:
+  case FLAGS_EN_PASSANT:
+    undo_move_piece(board, to_square, from_square, flags, captured_piece);
+    break;
   case FLAGS_SHORT_CASTLE:
     reverse_short_castle(board);
     break;
@@ -332,17 +391,17 @@ void board_unmake_move(Board *board, Move move) {
     reverse_long_castle(board);
     break;
   default:
-    undo_move_piece(board, to_square, from_square, flags);
+    undo_move_piece(board, to_square, from_square, flags, captured_piece);
     if (captured_piece != PIECE_NONE) {
       ToMove color = OPPOSITE_COLOR(board->to_move);
       set_piece_no_hash(board, to_square, captured_piece);
     }
 
     // clang-format off
-    if (flags == FLAGS_KNIGHT_PROMOTION | flags == FLAGS_KNIGHT_PROMOTION_CAPTURE) { set_piece_no_hash(board, from_square, PAWN); }
-    if (flags == FLAGS_BISHOP_PROMOTION | flags == FLAGS_BISHOP_PROMOTION_CAPTURE) { set_piece_no_hash(board, from_square, PAWN); }
-    if (flags == FLAGS_ROOK_PROMOTION   | flags == FLAGS_ROOK_PROMOTION_CAPTURE) { set_piece_no_hash(board, from_square, PAWN); }
-    if (flags == FLAGS_QUEEN_PROMOTION  | flags == FLAGS_QUEEN_PROMOTION_CAPTURE) { set_piece_no_hash(board, from_square, PAWN); }
+    if (flags & FLAGS_KNIGHT_PROMOTION) { set_piece_no_hash(board, from_square, PAWN); }
+    if (flags & FLAGS_BISHOP_PROMOTION) { set_piece_no_hash(board, from_square, PAWN); }
+    if (flags & FLAGS_ROOK_PROMOTION) { set_piece_no_hash(board, from_square, PAWN); }
+    if (flags & FLAGS_QUEEN_PROMOTION) { set_piece_no_hash(board, from_square, PAWN); }
     // clang-format on
 
     break;
@@ -351,6 +410,7 @@ void board_unmake_move(Board *board, Move move) {
 }
 
 bool board_valid(Board *board) {
+  DP_PRINTF("FUNC_TRACE", "board_valid\n");
   uint64_t all_pieces = 0;
   for (int color = 0; color < 2; color++) {
     for (int piece = 0; piece < 6; piece++) {
