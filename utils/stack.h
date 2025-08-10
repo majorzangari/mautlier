@@ -20,7 +20,8 @@
     if (stack->top + 1 >= capacity) {                                          \
       fprintf(stderr, "Stack is full; cannot push in %s\n", #name);            \
     }                                                                          \
-    stack->data[++stack->top] = value;                                         \
+    stack->top++;                                                              \
+    stack->data[stack->top] = value;                                           \
   }                                                                            \
                                                                                \
   static inline stack_type name##_pop(name *stack) {                           \

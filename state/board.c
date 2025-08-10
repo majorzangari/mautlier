@@ -134,16 +134,15 @@ static inline void set_piece(Board *board, GameStateDetails *state, int square,
   board->occupied |= (1ULL << square);
 }
 
-// hacky? basically a copy paste TODO: fix
+// CAN NOT BE USED FOR CAPTURES, POP STATE FIRST
 static inline void set_piece_no_hash(Board *board, int square, Piece piece) {
-  ToMove color = board->to_move;
+  ToMove color = OPPOSITE_COLOR(board->to_move);
   Piece previous_piece = board->piece_table[square];
   if (previous_piece != PIECE_NONE) {
-    board->pieces[OPPOSITE_COLOR(color)][previous_piece] &= ~(1ULL << square);
-    board->occupied_by_color[OPPOSITE_COLOR(color)] &= ~(1ULL << square);
+    board->pieces[color][previous_piece] &= ~(1ULL << square);
   }
-  board->pieces[color][piece] |= (1ULL << square);
   board->piece_table[square] = piece;
+  board->pieces[color][piece] |= (1ULL << square);
   board->occupied_by_color[color] |= (1ULL << square);
   board->occupied |= (1ULL << square);
 }
@@ -191,9 +190,10 @@ static inline void short_castle(Board *board, GameStateDetails *new_state) {
 
     current_hash = move_piece_hash(current_hash, KING, 3, 1, WHITE);
     current_hash = move_piece_hash(current_hash, ROOK, 0, 2, WHITE);
-    current_hash = toggle_castling_rights(current_hash, CR_WHITE_SHORT);
+    current_hash = toggle_castling_rights(current_hash, ZOBRIST_CR_WHITE_SHORT);
     if (new_state->castling_rights & CR_WHITE_LONG) {
-      current_hash = toggle_castling_rights(current_hash, CR_WHITE_LONG);
+      current_hash =
+          toggle_castling_rights(current_hash, ZOBRIST_CR_WHITE_LONG);
     }
 
     new_state->castling_rights &= ~(CR_WHITE_SHORT | CR_WHITE_LONG);
@@ -211,9 +211,10 @@ static inline void short_castle(Board *board, GameStateDetails *new_state) {
 
     current_hash = move_piece_hash(current_hash, KING, 59, 57, BLACK);
     current_hash = move_piece_hash(current_hash, ROOK, 56, 58, BLACK);
-    current_hash = toggle_castling_rights(current_hash, CR_BLACK_SHORT);
+    current_hash = toggle_castling_rights(current_hash, ZOBRIST_CR_BLACK_SHORT);
     if (new_state->castling_rights & CR_BLACK_LONG) {
-      current_hash = toggle_castling_rights(current_hash, CR_BLACK_LONG);
+      current_hash =
+          toggle_castling_rights(current_hash, ZOBRIST_CR_BLACK_LONG);
     }
 
     new_state->castling_rights &= ~(CR_BLACK_SHORT | CR_BLACK_LONG);
@@ -264,9 +265,10 @@ static inline void long_castle(Board *board, GameStateDetails *new_state) {
 
     current_hash = move_piece_hash(current_hash, KING, 3, 5, WHITE);
     current_hash = move_piece_hash(current_hash, ROOK, 7, 4, WHITE);
-    current_hash = toggle_castling_rights(current_hash, CR_WHITE_LONG);
+    current_hash = toggle_castling_rights(current_hash, ZOBRIST_CR_WHITE_LONG);
     if (new_state->castling_rights & CR_WHITE_SHORT) {
-      current_hash = toggle_castling_rights(current_hash, CR_WHITE_SHORT);
+      current_hash =
+          toggle_castling_rights(current_hash, ZOBRIST_CR_WHITE_SHORT);
     }
 
     new_state->castling_rights &= ~(CR_WHITE_SHORT | CR_WHITE_LONG);
@@ -284,9 +286,10 @@ static inline void long_castle(Board *board, GameStateDetails *new_state) {
 
     current_hash = move_piece_hash(current_hash, KING, 59, 61, BLACK);
     current_hash = move_piece_hash(current_hash, ROOK, 63, 60, BLACK);
-    current_hash = toggle_castling_rights(current_hash, CR_BLACK_LONG);
+    current_hash = toggle_castling_rights(current_hash, ZOBRIST_CR_BLACK_LONG);
     if (new_state->castling_rights & CR_BLACK_SHORT) {
-      current_hash = toggle_castling_rights(current_hash, CR_BLACK_SHORT);
+      current_hash =
+          toggle_castling_rights(current_hash, ZOBRIST_CR_BLACK_SHORT);
     }
     new_state->castling_rights &= ~(CR_BLACK_SHORT | CR_BLACK_LONG);
   }
@@ -356,13 +359,12 @@ void board_make_move(Board *board, Move move) {
     break;
   default:
     move_piece(board, &new_state, from_square, to_square, flags);
-    // TODO: kill stupid logic
 
     // clang-format off
-    if (flags & FLAGS_KNIGHT_PROMOTION) { set_piece(board, &new_state, to_square, KNIGHT); }
-    if (flags & FLAGS_BISHOP_PROMOTION) { set_piece(board, &new_state, to_square, BISHOP); }
-    if (flags & FLAGS_ROOK_PROMOTION) { set_piece(board, &new_state, to_square, ROOK); }
-    if (flags & FLAGS_QUEEN_PROMOTION) { set_piece(board, &new_state, to_square, QUEEN); }
+    if      ((flags & PROMOTION_MASK) == FLAGS_KNIGHT_PROMOTION) { set_piece(board, &new_state, to_square, KNIGHT); }
+    else if ((flags & PROMOTION_MASK) == FLAGS_BISHOP_PROMOTION) { set_piece(board, &new_state, to_square, BISHOP); }
+    else if ((flags & PROMOTION_MASK) == FLAGS_ROOK_PROMOTION  ) { set_piece(board, &new_state, to_square, ROOK);   }
+    else if ((flags & PROMOTION_MASK) == FLAGS_QUEEN_PROMOTION ) { set_piece(board, &new_state, to_square, QUEEN);  }
     // clang-format on
     break;
   }
@@ -392,16 +394,12 @@ void board_unmake_move(Board *board, Move move) {
     break;
   default:
     undo_move_piece(board, to_square, from_square, flags, captured_piece);
-    if (captured_piece != PIECE_NONE) {
-      ToMove color = OPPOSITE_COLOR(board->to_move);
-      set_piece_no_hash(board, to_square, captured_piece);
-    }
 
     // clang-format off
-    if (flags & FLAGS_KNIGHT_PROMOTION) { set_piece_no_hash(board, from_square, PAWN); }
-    if (flags & FLAGS_BISHOP_PROMOTION) { set_piece_no_hash(board, from_square, PAWN); }
-    if (flags & FLAGS_ROOK_PROMOTION) { set_piece_no_hash(board, from_square, PAWN); }
-    if (flags & FLAGS_QUEEN_PROMOTION) { set_piece_no_hash(board, from_square, PAWN); }
+    if      ((flags & PROMOTION_MASK) == FLAGS_KNIGHT_PROMOTION) { set_piece_no_hash(board, from_square, PAWN); }
+    else if ((flags & PROMOTION_MASK) == FLAGS_BISHOP_PROMOTION) { set_piece_no_hash(board, from_square, PAWN); }
+    else if ((flags & PROMOTION_MASK) == FLAGS_ROOK_PROMOTION  ) { set_piece_no_hash(board, from_square, PAWN); }
+    else if ((flags & PROMOTION_MASK) == FLAGS_QUEEN_PROMOTION ) { set_piece_no_hash(board, from_square, PAWN); }
     // clang-format on
 
     break;

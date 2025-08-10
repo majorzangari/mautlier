@@ -1,5 +1,6 @@
 #include "search.h"
 #include "debug_printer.h"
+#include "diagnostic_tools.h"
 #include "eval.h"
 #include "fen.h"
 #include "misc.h"
@@ -31,6 +32,7 @@ static inline int lazy_search_negamax(Board *board, int depth, int alpha,
 
     if (!board_valid(board)) {
       printf("Invalid board after making move %s\n", move_to_string(moves[i]));
+      printf("Current board: %s\n", board_to_debug_string(board));
       printf("Board before move: %s\n", prefen);
       exit(1); // TODO: remove
     }

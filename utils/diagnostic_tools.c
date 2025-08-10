@@ -113,14 +113,15 @@ char *board_to_debug_string(Board *board) {
     }
   }
 
-  for (int i = 0; i <= board->game_state_stack.top; i++) {
+  for (int i = board->game_state_stack.top; i >= 0; i--) {
     GameStateDetails state =
         GameStateDetailsStack_peek_down(&board->game_state_stack, i);
     buffer_ptr += snprintf(buffer_ptr, buffer_size - (buffer_ptr - buffer),
                            "State "
                            "%d:\nhalfmove_clock: %d\ncastling_rights: %d\nen_"
-                           "passant: %lx\ncaptured_piece: %d\nhash: %lx\n",
-                           i, state.halfmove_clock, state.castling_rights,
+                           "passant: %lx\ncaptured_piece: %d\nhash: %lx\n\n",
+                           (board->game_state_stack.top - i + 1),
+                           state.halfmove_clock, state.castling_rights,
                            state.en_passant, state.captured_piece, state.hash);
   }
   *buffer_ptr = '\0';

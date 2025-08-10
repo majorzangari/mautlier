@@ -35,6 +35,8 @@ typedef struct Board Board;
 #define FLAGS_ROOK_PROMOTION_CAPTURE 14
 #define FLAGS_QUEEN_PROMOTION_CAPTURE 15
 
+#define PROMOTION_MASK 0x07
+
 typedef uint16_t Move;
 
 #define NULL_MOVE 11

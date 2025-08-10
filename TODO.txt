@@ -1,1 +1,1 @@
-fix hash (first test case is hashing to 0)
+Make special draws and other game endings actually do something

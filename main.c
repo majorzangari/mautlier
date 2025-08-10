@@ -30,10 +30,10 @@ int main(int argc, char **argv) {
 
   while (1) {
     getchar();
-    Move selected_move = lazy_search(board, 4);
+    Move selected_move = lazy_search(board, 6);
     board_make_move(board, selected_move);
 
-    printf("%s\n", board_to_string(board));
+    printf("%s\n", board_to_string((board)));
   }
   free(board);
   return 0;

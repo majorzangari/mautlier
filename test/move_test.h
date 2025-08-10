@@ -26,10 +26,17 @@ void check_invalid(Board *board, const char *context, ...) { // TODO: fix hacks
   }
 }
 
-void check_compare(Board *a, Board *b, const char *context) {
-  if (!compare_boards(a, b)) {
-    fprintf(stderr, "Board comparison failed: %s\n", context);
+void check_compare(Board *copy, Board *changed, const char *context, ...) {
+  if (!compare_boards(copy, changed)) {
+    va_list args;
+    va_start(args, context);
+    char buffer[256];
+    vsnprintf(buffer, sizeof(buffer), context, args);
+
+    fprintf(stderr, "Board comparison failed: %s\n", buffer);
     fprintf(stderr, "Board diff: %s\n", last_board_compare_diff());
+    fprintf(stderr, "%s\n", board_to_string(changed));
+    // fprintf(stderr, "%s\n", board_to_debug_string(changed));
     exit(1);
   }
 }
@@ -50,10 +57,12 @@ void test_move_making(char *pos) {
     board_make_move(board, moves[i]);
 
     check_invalid(board, "after making move %s", move_to_string(moves[i]));
+
     board_unmake_move(board, moves[i]);
     check_invalid(board, "after unmaking move %s", move_to_string(moves[i]));
 
-    check_compare(board, board_copy, "after unmaking move comparison");
+    check_compare(board_copy, board, "after unmaking move %s",
+                  move_to_string(moves[i]));
     free(board_copy);
   }
 
@@ -68,7 +77,9 @@ bool make_unmake_suite() {
       "r3k2r/pppppppp/8/8/8/8/PPPPPPPP/R3K2R w KQkq - 0 1",            // castling shenanigans
       "r3k2r/pppppppp/8/8/8/8/PPPPPPPP/R3K2R b KQkq - 0 1",            // black castling shenanigans
       "rnbqkbnr/pppp1ppp/4p3/8/6P1/5P2/PPPPP2P/RNBQKBNR b KQkq - 0 2", // checkmate available
-      "r1bqkb1r/2p1ppp1/p1p5/3p4/4P3/2PP1Q2/P1P2PPP/R1B1K1NR b KkQq - 1 0"
+      "r1bqkb1r/2p1ppp1/p1p5/3p4/4P3/2PP1Q2/P1P2PPP/R1B1K1NR b KkQq - 1 0",
+      "r1bqkb1r/2p1ppp1/p1p5/3p4/4P3/2PP1Q2/P1P2PPP/R1B1K1NR b KkQq - 1 0",
+      "r1bqkb1r/2p1ppp1/p1p5/3p4/4PQ2/2PP4/PBP2PpP/R3K1NR b KQkq - 1 2"
   };
   // clang-format on
   for (size_t i = 0; i < (sizeof(positions) / sizeof(positions[0])); i++) {

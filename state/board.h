@@ -91,7 +91,7 @@ typedef struct GameStateDetails {
 } GameStateDetails;
 
 #define MAX_SAVED_GAMESTATES                                                   \
-  128 // Max a chess game could need is ~12,000 but 99% will be less than 512
+  512 // Max a chess game could need is ~12,000 but 99% will be less than 512
       // (538 was the most any tournament game took)
 DEFINE_STACK_TYPE(GameStateDetailsStack, GameStateDetails, MAX_SAVED_GAMESTATES)
 

@@ -212,9 +212,9 @@ char *board_to_fen(Board *board) {
     index += 2;
   }
 
-  index += snprintf(
-      out + index, buffer_size - index, " %d %d", curr_state.halfmove_clock,
-      0); // TODO: actually write a real fullmove clock if I end up storing it
+  index +=
+      snprintf(out + index, buffer_size - index, " %d %d",
+               curr_state.halfmove_clock, board->game_state_stack.top / 2 + 1);
   out[index] = '\0';
   return out;
 }
