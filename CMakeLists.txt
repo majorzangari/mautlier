@@ -5,14 +5,23 @@ set(CMAKE_C_STANDARD 11)
 
 add_executable(mautlier 
         main.c
+
         state/board.c
         state/fen.c
         state/move.c
         state/constants.c
+
         evaluation/eval.c
+
         search/search.c
+
         utils/diagnostic_tools.c
         utils/debug_printer.c
+        utils/misc.c
+
+        hash/hash.c
+
+        interface/cli.c
 )
 
 target_include_directories(mautlier PRIVATE
@@ -21,6 +30,8 @@ target_include_directories(mautlier PRIVATE
     ${CMAKE_SOURCE_DIR}/hash
     ${CMAKE_SOURCE_DIR}/evaluation
     ${CMAKE_SOURCE_DIR}/search
+    ${CMAKE_SOURCE_DIR}/interface
+    ${CMAKE_SOURCE_DIR}/test
 )
 
 if (CMAKE_BUILD_TYPE STREQUAL "Debug")

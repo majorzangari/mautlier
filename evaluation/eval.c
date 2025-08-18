@@ -1,6 +1,7 @@
 #include "eval.h"
 #include "bithelpers.h"
 #include "board.h"
+#include "search.h"
 
 #define LAZY_EVAL_PAWN 1
 #define LAZY_EVAL_KNIGHT 3
@@ -10,6 +11,20 @@
 #define LAZY_EVAL_KING 0
 
 int lazy_evaluation(Board *board) {
+  if (board->game_state != GS_ONGOING) {
+    switch (board->game_state) {
+    case GS_WHITE_WON:
+      return INF_SCORE;
+    case GS_BLACK_WON:
+      return NEG_INF_SCORE;
+    case GS_DRAW:
+      return 0;
+    case GS_ONGOING:
+      fprintf(stderr, "unreachable\n");
+      return 0; // shouldn't happen
+    }
+  }
+
   int out = 0;
 
   ToMove color = board->to_move;

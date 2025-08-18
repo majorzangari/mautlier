@@ -5,13 +5,10 @@
 #include "fen.h"
 #include "misc.h"
 #include "move.h"
+
 #include <stdlib.h>
 
 #define COLOR_MULTIPLIER(color) ((color) == WHITE ? 1 : -1)
-
-// inf might be a misnomer, just a big number to trump other factors
-#define INF_SCORE 0xFFFFFF
-#define NEG_INF_SCORE -0xFFFFFF
 
 static inline int lazy_search_negamax(Board *board, int depth, int alpha,
                                       int beta) {
@@ -59,6 +56,10 @@ static inline int lazy_search_negamax(Board *board, int depth, int alpha,
 Move lazy_search(Board *board, int depth) {
   DP_PRINTF("FUNC_TRACE", "lazy_search\n");
 
+  if (board->game_state != GS_ONGOING) {
+    return NULL_MOVE; // game is over, no moves to make
+  }
+
   Move moves[MAX_MOVES];
   int num_moves = generate_moves(board, moves);
   int best_score = NEG_INF_SCORE;
@@ -86,7 +87,11 @@ Move lazy_search(Board *board, int depth) {
     }
   }
   if (best_move == NULL_MOVE) { // either checkmate or stalemate TODO:handle
-    printf("lets fucking go checkmate thing\n\n\n\n\n\n\n\n\n\n\n\n\n\n");
+    if (king_in_check(board, color)) {
+      board->game_state = (color == WHITE) ? GS_BLACK_WON : GS_WHITE_WON;
+    } else {
+      board->game_state = GS_DRAW; // stalemate
+    }
     return NULL_MOVE;
   }
   return best_move;

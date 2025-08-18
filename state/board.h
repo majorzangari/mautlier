@@ -71,11 +71,7 @@ typedef enum { // TODO: could maybe improve performance by leaving checkmates
   GS_ONGOING,
   GS_WHITE_WON,
   GS_BLACK_WON,
-  GS_DRAW_STALEMATE,
-  GS_DRAW_BY_REPETITION,
-  GS_DRAW_FIFTY_MOVE_RULE,
-  GS_DRAW_INSUFFICIENT_MATERIAL,
-  GS_INVALID,
+  GS_DRAW,
 } GameState;
 
 typedef uint64_t Bitboard;
@@ -96,6 +92,7 @@ typedef struct GameStateDetails {
 DEFINE_STACK_TYPE(GameStateDetailsStack, GameStateDetails, MAX_SAVED_GAMESTATES)
 
 typedef struct Board {
+  GameState game_state;
   Bitboard pieces[2][6];
   Bitboard occupied_by_color[2];
   Bitboard occupied;
@@ -108,6 +105,9 @@ typedef struct Board {
   ((board)->game_state_stack.data[(board)->game_state_stack.top])
 
 Board *init_default_board();
+// TODO: fix all this BS mallocing
+// void set_default_board(Board *board);
+
 void board_make_move(Board *board, Move move);
 void board_unmake_move(Board *board, Move move);
 

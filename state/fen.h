@@ -6,6 +6,9 @@
 
 #include "board.h"
 
+#define STARTING_POS_FEN                                                       \
+  "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
+
 Board *fen_to_board(char *fen);
 char *board_to_fen(Board *board);
 uint64_t square_to_bit(const char *square);

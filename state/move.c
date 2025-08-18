@@ -124,8 +124,8 @@ int generate_en_passant(Bitboard pawns, Bitboard ep, ToMove color,
   Bitboard attackers;
   if (color == WHITE) {
     Bitboard r5_pawns = pawns & RANK_5;
-    Bitboard right_attackers = (ep >> 7) & r5_pawns & ~FILE_A;
-    Bitboard left_attackers = (ep >> 9) & r5_pawns & ~FILE_H;
+    Bitboard right_attackers = (ep >> 7) & r5_pawns & ~FILE_H;
+    Bitboard left_attackers = (ep >> 9) & r5_pawns & ~FILE_A;
     attackers = left_attackers | right_attackers;
   } else {
     Bitboard r4_pawns = pawns & RANK_4;

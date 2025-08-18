@@ -3,9 +3,10 @@
 //
 
 #include "fen.h"
+#include "bithelpers.h"
 #include "debug_printer.h"
 #include "diagnostic_tools.h"
-#include "hash.c"
+#include "hash.h"
 
 #include <stddef.h>
 #include <stdlib.h>
@@ -111,6 +112,7 @@ Board *fen_to_board(char *input_fen) {
   strcpy(fen, input_fen); // slow ig but helps outside a lot
 
   Board *out = calloc(1, sizeof(Board));
+  out->game_state = GS_ONGOING;
 
   char *saveptr;
 

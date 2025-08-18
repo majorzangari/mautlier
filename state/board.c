@@ -135,8 +135,8 @@ static inline void set_piece(Board *board, GameStateDetails *state, int square,
 }
 
 // CAN NOT BE USED FOR CAPTURES, POP STATE FIRST
-static inline void set_piece_no_hash(Board *board, int square, Piece piece) {
-  ToMove color = OPPOSITE_COLOR(board->to_move);
+static inline void set_piece_no_hash(Board *board, int square, Piece piece,
+                                     ToMove color) {
   Piece previous_piece = board->piece_table[square];
   if (previous_piece != PIECE_NONE) {
     board->pieces[color][previous_piece] &= ~(1ULL << square);
@@ -160,7 +160,9 @@ static inline bool is_special_draw(Board *board) {
 
   // repetition
   int identical_states = 1;
-  for (int i = 1; i <= curr_state.halfmove_clock; i++) {
+  for (int i = 0;
+       i < curr_state.halfmove_clock && (board->game_state_stack.top - i >= 0);
+       i++) {
     GameStateDetails previous_state =
         GameStateDetailsStack_peek_down(&board->game_state_stack, i);
     if (previous_state.hash == curr_state.hash) {
@@ -322,9 +324,27 @@ static inline void reverse_long_castle(Board *board) {
   }
 }
 
-// TODO: check capture flag instead of piece board
+void kill_piece(Board *board, GameStateDetails *state, uint8_t square,
+                ToMove color) {
+  DP_PRINTF("FUNC_TRACE", "kill_piece\n");
+  Piece piece = board->piece_table[square];
+  if (piece == PIECE_NONE) {
+    return; // nothing to kill
+  }
+  state->captured_piece = piece;
+  board->pieces[color][piece] &= ~(1ULL << square);
+  board->occupied_by_color[color] &= ~(1ULL << square);
+  board->occupied &= ~(1ULL << square);
+  board->piece_table[square] = PIECE_NONE;
+  state->hash = toggle_piece(state->hash, piece, square, color);
+}
+
 void board_make_move(Board *board, Move move) {
   DP_PRINTF("FUNC_TRACE", "board_make_move\n");
+  if (move == NULL_MOVE) {
+    return;
+  }
+
   uint8_t from_square = move_from_square(move);
   uint8_t to_square = move_to_square(move);
   uint8_t flags = move_flags(move);
@@ -335,6 +355,9 @@ void board_make_move(Board *board, Move move) {
   new_state.captured_piece = PIECE_NONE;
   new_state.hash = toggle_turn(BOARD_CURR_STATE(board).hash);
 
+  int old_ep = lsb_index(BOARD_CURR_STATE(board).en_passant);
+  new_state.hash = toggle_en_passant(new_state.hash, old_ep);
+
   switch (flags) {
   case FLAGS_PAWN_PUSH:
     move_piece(board, &new_state, from_square, to_square, flags);
@@ -344,7 +367,7 @@ void board_make_move(Board *board, Move move) {
     move_piece(board, &new_state, from_square, to_square, flags);
     new_state.halfmove_clock = 0;
     int ep_shift =
-        (board->to_move == WHITE) ? (to_square + 8) : (to_square - 8);
+        (board->to_move == WHITE) ? (to_square - 8) : (to_square + 8);
     new_state.en_passant = 1ULL << ep_shift;
     new_state.hash = toggle_en_passant(new_state.hash, new_state.en_passant);
     break;
@@ -355,7 +378,12 @@ void board_make_move(Board *board, Move move) {
     long_castle(board, &new_state);
     break;
   case FLAGS_EN_PASSANT: // why is this a case? TODO: figure out
-    move_piece(board, &new_state, from_square, to_square, FLAGS_CAPTURE);
+    move_piece(board, &new_state, from_square, to_square, FLAGS_NONE);
+    int ep_capture_shift =
+        (board->to_move == WHITE) ? (to_square - 8) : (to_square + 8);
+    kill_piece(board, &new_state, ep_capture_shift,
+               OPPOSITE_COLOR(board->to_move));
+
     break;
   default:
     move_piece(board, &new_state, from_square, to_square, flags);
@@ -369,13 +397,26 @@ void board_make_move(Board *board, Move move) {
     break;
   }
   GameStateDetailsStack_push(&board->game_state_stack, new_state);
+  if (is_special_draw(board)) {
+    board->game_state = GS_DRAW;
+  } else {
+    board->game_state = GS_ONGOING; // technically could be won but saves time
+                                    // to not figure out yet
+  }
   board->to_move = OPPOSITE_COLOR(board->to_move);
 }
 
 void board_unmake_move(Board *board, Move move) {
   DP_PRINTF("FUNC_TRACE", "board_unmake_move\n");
-  Piece captured_piece =
-      GameStateDetailsStack_pop(&board->game_state_stack).captured_piece;
+  if (move == NULL_MOVE) {
+    return;
+  }
+
+  GameStateDetails old_state =
+      GameStateDetailsStack_pop(&board->game_state_stack);
+
+  Piece captured_piece = old_state.captured_piece;
+
   uint8_t from_square = move_from_square(move);
   uint8_t to_square = move_to_square(move);
   uint8_t flags = move_flags(move);
@@ -383,8 +424,13 @@ void board_unmake_move(Board *board, Move move) {
   switch (flags) {
   case FLAGS_PAWN_PUSH:
   case FLAGS_DOUBLE_PUSH:
-  case FLAGS_EN_PASSANT:
     undo_move_piece(board, to_square, from_square, flags, captured_piece);
+    break;
+  case FLAGS_EN_PASSANT:
+    undo_move_piece(board, to_square, from_square, FLAGS_NONE, PIECE_NONE);
+    int ep_capture_shift =
+        (board->to_move == WHITE) ? (to_square + 8) : (to_square - 8);
+    set_piece_no_hash(board, ep_capture_shift, PAWN, board->to_move);
     break;
   case FLAGS_SHORT_CASTLE:
     reverse_short_castle(board);
@@ -396,14 +442,15 @@ void board_unmake_move(Board *board, Move move) {
     undo_move_piece(board, to_square, from_square, flags, captured_piece);
 
     // clang-format off
-    if      ((flags & PROMOTION_MASK) == FLAGS_KNIGHT_PROMOTION) { set_piece_no_hash(board, from_square, PAWN); }
-    else if ((flags & PROMOTION_MASK) == FLAGS_BISHOP_PROMOTION) { set_piece_no_hash(board, from_square, PAWN); }
-    else if ((flags & PROMOTION_MASK) == FLAGS_ROOK_PROMOTION  ) { set_piece_no_hash(board, from_square, PAWN); }
-    else if ((flags & PROMOTION_MASK) == FLAGS_QUEEN_PROMOTION ) { set_piece_no_hash(board, from_square, PAWN); }
+    if      ((flags & PROMOTION_MASK) == FLAGS_KNIGHT_PROMOTION) { set_piece_no_hash(board, from_square, PAWN, OPPOSITE_COLOR(board->to_move)); }
+    else if ((flags & PROMOTION_MASK) == FLAGS_BISHOP_PROMOTION) { set_piece_no_hash(board, from_square, PAWN, OPPOSITE_COLOR(board->to_move)); }
+    else if ((flags & PROMOTION_MASK) == FLAGS_ROOK_PROMOTION  ) { set_piece_no_hash(board, from_square, PAWN, OPPOSITE_COLOR(board->to_move)); }
+    else if ((flags & PROMOTION_MASK) == FLAGS_QUEEN_PROMOTION ) { set_piece_no_hash(board, from_square, PAWN, OPPOSITE_COLOR(board->to_move)); }
     // clang-format on
 
     break;
   }
+  board->game_state = GS_ONGOING;
   board->to_move = OPPOSITE_COLOR(board->to_move);
 }
 

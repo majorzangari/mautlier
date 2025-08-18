@@ -1,1 +1,2 @@
-Make special draws and other game endings actually do something
+en passant en passant en passant everything make and unmake is broken
+draw by material? idc

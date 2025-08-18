@@ -16,6 +16,8 @@
                                                                                \
   static inline void name##_init(name *stack) { stack->top = -1; }             \
                                                                                \
+  static inline int name##_is_empty(name *stack) { return stack->top == -1; }  \
+                                                                               \
   static inline void name##_push(name *stack, stack_type value) {              \
     if (stack->top + 1 >= capacity) {                                          \
       fprintf(stderr, "Stack is full; cannot push in %s\n", #name);            \
