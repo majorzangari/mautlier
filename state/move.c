@@ -251,6 +251,52 @@ int generate_bishop_moves(Bitboard bishops, Bitboard occupied,
   return num_moves;
 }
 
+static inline bool index_in_check(Board *board, ToMove color,
+                                  int square_index) {
+  DP_PRINTF("FUNC_TRACE", "index_in_check\n");
+  Bitboard same_side_occupied = board->occupied_by_color[color];
+
+  ToMove opposite_color = OPPOSITE_COLOR(color);
+  Bitboard potential_rook_attacks =
+      get_rook_attack_board(square_index, board->occupied, same_side_occupied);
+  if (potential_rook_attacks & (board->pieces[OPPOSITE_COLOR(color)][ROOK] |
+                                board->pieces[OPPOSITE_COLOR(color)][QUEEN])) {
+    return true;
+  }
+
+  Bitboard potential_bishop_attacks = get_bishop_attack_board(
+      square_index, board->occupied, same_side_occupied);
+  if (potential_bishop_attacks & (board->pieces[opposite_color][BISHOP] |
+                                  board->pieces[opposite_color][QUEEN])) {
+    return true;
+  }
+
+  Bitboard potential_knight_attacks = knight_moves[square_index];
+  if (potential_knight_attacks & board->pieces[opposite_color][KNIGHT]) {
+    return true;
+  }
+
+  Bitboard potential_king_attacks = king_moves[square_index];
+  if (potential_king_attacks & board->pieces[opposite_color][KING]) {
+    return true;
+  }
+
+  Bitboard index_square = 1ULL << square_index;
+
+  Bitboard potential_pawn_attacks =
+      (color == WHITE) ? (index_square << 7) & ~FILE_A  // left capture
+                       : (index_square >> 9) & ~FILE_A; // right capture
+
+  potential_pawn_attacks |= (color == WHITE)
+                                ? (index_square << 9) & ~FILE_H // right capture
+                                : (index_square >> 7) & ~FILE_H; // left capture
+
+  if (potential_pawn_attacks & board->pieces[opposite_color][PAWN]) {
+    return true;
+  }
+  return false;
+}
+
 int generate_castling(Board *board, Move *moves, GameStateDetails details) {
   DP_PRINTF("FUNC_TRACE", "generate_castling\n");
   bool short_available = (board->to_move == WHITE)
@@ -266,18 +312,52 @@ int generate_castling(Board *board, Move *moves, GameStateDetails details) {
     Bitboard clearance_mask = (board->to_move == WHITE)
                                   ? WHITE_SHORT_CASTLE_CLEARANCE_MASK
                                   : BLACK_SHORT_CASTLE_CLEARANCE_MASK;
+
     if ((board->occupied & clearance_mask) == 0) {
-      *moves++ = encode_move(0, 0, FLAGS_SHORT_CASTLE);
-      num_moves++;
+      Bitboard check_mask = (board->to_move == WHITE)
+                                ? WHITE_SHORT_CASTLE_CHECK_MASK
+                                : BLACK_SHORT_CASTLE_CHECK_MASK;
+
+      bool check_cleared = true; // bars
+      while (check_mask) {
+        int index = lsb_index(check_mask);
+        pop_lsb(check_mask);
+        if (index_in_check(board, board->to_move, index)) {
+          check_cleared = false;
+          break;
+        }
+      }
+
+      if (check_cleared) {
+        *moves++ = encode_move(0, 0, FLAGS_SHORT_CASTLE);
+        num_moves++;
+      }
     }
   }
   if (long_available) {
     Bitboard clearance_mask = (board->to_move == WHITE)
                                   ? WHITE_LONG_CASTLE_CLEARANCE_MASK
                                   : BLACK_LONG_CASTLE_CLEARANCE_MASK;
+
     if ((board->occupied & clearance_mask) == 0) {
-      *moves++ = encode_move(0, 0, FLAGS_LONG_CASTLE);
-      num_moves++;
+      Bitboard check_mask = (board->to_move == WHITE)
+                                ? WHITE_LONG_CASTLE_CHECK_MASK
+                                : BLACK_LONG_CASTLE_CHECK_MASK;
+
+      bool check_cleared = true; // bars again
+      while (check_mask) {
+        int index = lsb_index(check_mask);
+        pop_lsb(check_mask);
+        if (index_in_check(board, board->to_move, index)) {
+          check_cleared = false;
+          break;
+        }
+      }
+
+      if (check_cleared) {
+        *moves++ = encode_move(0, 0, FLAGS_LONG_CASTLE);
+        num_moves++;
+      }
     }
   }
   return num_moves;
@@ -319,54 +399,7 @@ int generate_moves(Board *board, Move moves[MAX_MOVES]) {
 }
 
 bool king_in_check(Board *board, ToMove color) {
-  DP_PRINTF("FUNC_TRACE", "king_in_check\n");
-  Bitboard same_side_occupied = board->occupied_by_color[color];
-
-  int king_square = lsb_index(board->pieces[color][KING]);
-  if (king_square == 64) { // TODO: handle lmao
-    printf("No king found!\n");
-    exit(1);
-  }
-
-  ToMove opposite_color = OPPOSITE_COLOR(color);
-  Bitboard potential_rook_attacks =
-      get_rook_attack_board(king_square, board->occupied, same_side_occupied);
-  if (potential_rook_attacks & (board->pieces[OPPOSITE_COLOR(color)][ROOK] |
-                                board->pieces[OPPOSITE_COLOR(color)][QUEEN])) {
-    return true;
-  }
-
-  Bitboard potential_bishop_attacks =
-      get_bishop_attack_board(king_square, board->occupied, same_side_occupied);
-  if (potential_bishop_attacks & (board->pieces[opposite_color][BISHOP] |
-                                  board->pieces[opposite_color][QUEEN])) {
-    return true;
-  }
-
-  Bitboard potential_knight_attacks = knight_moves[king_square];
-  if (potential_knight_attacks & board->pieces[opposite_color][KNIGHT]) {
-    return true;
-  }
-
-  Bitboard potential_king_attacks = king_moves[king_square];
-  if (potential_king_attacks & board->pieces[opposite_color][KING]) {
-    return true;
-  }
-
-  Bitboard kings = board->pieces[color][KING];
-
-  Bitboard potential_pawn_attacks =
-      (color == WHITE) ? (kings << 7) & ~FILE_A  // left capture
-                       : (kings >> 9) & ~FILE_A; // right capture
-
-  potential_pawn_attacks |= (color == WHITE)
-                                ? (kings << 9) & ~FILE_H  // right capture
-                                : (kings >> 7) & ~FILE_H; // left capture
-
-  if (potential_pawn_attacks & board->pieces[opposite_color][PAWN]) {
-    return true;
-  }
-  return false;
+  return index_in_check(board, color, lsb_index(board->pieces[color][KING]));
 }
 
 char *move_to_string(Move move) {

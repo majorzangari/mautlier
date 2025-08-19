@@ -1,5 +1,6 @@
 #include "cli.h"
 #include "board.h"
+#include "fen.h"
 #include "misc.h"
 #include "perft.h"
 
@@ -62,9 +63,22 @@ int cli_main() {
       char *arg = strtok_r(NULL, " ", &saveptr);
       if (arg == NULL) {
         printf("Error: Missing position arg\n");
-      } else if (or_strcmp(arg, 2, "start_pos", "start")) {
+      } else if (or_strcmp(arg, 3, "start_pos", "startpos", "start")) {
         free(board);
         board = init_default_board();
+      } else if (or_strcmp(arg, 2, "fen", "f")) {
+        char *fen_str = strtok_r(NULL, "", &saveptr); // get rest of line
+        if (fen_str == NULL) {
+          printf("Error: Missing FEN string for fen command\n");
+        } else {
+          Board *new_board = fen_to_board(fen_str);
+          if (new_board == NULL) { // TODO: make this actually return NULL
+            printf("Error: Invalid FEN string\n");
+          } else {
+            free(board);
+            board = new_board;
+          }
+        }
       } else {
         printf("Unknown position command: '%s'\n", arg);
       }
@@ -76,15 +90,22 @@ int cli_main() {
         printf("Error: Missing move string for move command\n");
 
       } else if (or_strcmp(arg, 2, "list", "l")) {
-        Move moves[MAX_MOVES];
-        int num_moves = generate_moves(board, moves);
-        for (int i = 0; i < num_moves; i++) {
-          printf("%d: %s\n", i + 1, move_to_string(moves[i]));
+        if (board->game_state != GS_ONGOING) {
+          printf("Cannot generate moves, game is not ongoing\n");
+          continue;
+        } else {
+          Move moves[MAX_MOVES];
+          int num_moves = generate_moves(board, moves);
+          order_alphabetically(moves, num_moves);
+          for (int i = 0; i < num_moves; i++) {
+            printf("%d: %s\n", i + 1, move_to_string(moves[i]));
+          }
         }
 
       } else if (or_strcmp(arg, 2, "make", "m")) {
         Move moves[MAX_MOVES];
         int num_moves = generate_moves(board, moves);
+        order_alphabetically(moves, num_moves);
         char *endptr;
 
         char *move_index_str = strtok_r(NULL, " ", &saveptr);
@@ -113,6 +134,12 @@ int cli_main() {
 
     else if (or_strcmp(command, 1, "print")) {
       char *board_str = board_to_string(board);
+      printf("%s\n", board_str);
+      free(board_str);
+    }
+
+    else if (or_strcmp(command, 2, "debug_print", "dp")) {
+      char *board_str = board_to_debug_string(board);
       printf("%s\n", board_str);
       free(board_str);
     }

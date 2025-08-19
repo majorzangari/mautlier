@@ -160,19 +160,18 @@ static inline bool is_special_draw(Board *board) {
 
   // repetition
   int identical_states = 1;
-  for (int i = 0;
-       i < curr_state.halfmove_clock && (board->game_state_stack.top - i >= 0);
-       i++) {
+  int stack_size = GameStateDetailsStack_size(&board->game_state_stack);
+  for (int i = 1; i < stack_size; i++) {
     GameStateDetails previous_state =
         GameStateDetailsStack_peek_down(&board->game_state_stack, i);
     if (previous_state.hash == curr_state.hash) {
       identical_states++;
     }
+
     if (identical_states >= 3) {
       return true;
     }
   }
-
   // TODO: insufficient material
   return false;
 }

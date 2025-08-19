@@ -33,7 +33,6 @@ target_include_directories(mautlier PRIVATE
     ${CMAKE_SOURCE_DIR}/interface
     ${CMAKE_SOURCE_DIR}/test
 )
-
 if (CMAKE_BUILD_TYPE STREQUAL "Debug")
   target_compile_definitions(mautlier PRIVATE MAUTLIER_DEBUG)
 endif()

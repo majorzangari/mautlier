@@ -3,6 +3,7 @@
 
 #include "board.h"
 #include "diagnostic_tools.h"
+#include "misc.h"
 #include "move.h"
 
 #include <stdint.h>
@@ -40,12 +41,13 @@ void perft_divide(Board *board, int depth) {
   uint64_t total_nodes = 0;
   Move moves[MAX_MOVES];
   int num_moves = generate_moves(board, moves);
+  order_alphabetically(moves, num_moves);
 
   for (int i = 0; i < num_moves; i++) {
     board_make_move(board, moves[i]);
     if (!king_in_check(board, OPPOSITE_COLOR(board->to_move))) {
       uint64_t nodes = perft(board, depth - 1);
-      printf("Move %s: %lu nodes\n", move_to_string(moves[i]), nodes);
+      printf("%d: %s: %lu nodes\n", i + 1, move_to_string(moves[i]), nodes);
       total_nodes += nodes;
     }
     board_unmake_move(board, moves[i]);
