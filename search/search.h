@@ -4,8 +4,8 @@
 #include "move.h"
 
 // inf might be a misnomer, just a big number to trump other factors
-#define INF_SCORE 0xFFFFFF
-#define NEG_INF_SCORE -0xFFFFFF
+#define INF_SCORE 0xFFFFFFF
+#define NEG_INF_SCORE -0xFFFFFFF
 
 Move lazy_search(Board *board, int depth);
 

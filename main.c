@@ -3,6 +3,7 @@
 #include "debug_printer.h"
 #include "hash.h"
 #include "misc.h"
+#include "uci.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -36,5 +37,6 @@ int main(int argc, char **argv) {
     }
   }
 
-  return 0;
+  // default mode is cli
+  return uci_main();
 }

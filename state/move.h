@@ -47,4 +47,8 @@ bool king_in_check(Board *board, ToMove color);
 
 char *move_to_string(Move move);
 
+Move algebraic_to_move(Board *board, const char *str);
+
+char *move_to_algebraic(Move move, ToMove color);
+
 #endif // MOVE_H

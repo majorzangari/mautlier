@@ -22,6 +22,9 @@ add_executable(mautlier
         hash/hash.c
 
         interface/cli.c
+        interface/uci.c
+
+        benchmark/benchmark.c
 )
 
 target_include_directories(mautlier PRIVATE
@@ -32,6 +35,7 @@ target_include_directories(mautlier PRIVATE
     ${CMAKE_SOURCE_DIR}/search
     ${CMAKE_SOURCE_DIR}/interface
     ${CMAKE_SOURCE_DIR}/test
+    ${CMAKE_SOURCE_DIR}/benchmark
 )
 if (CMAKE_BUILD_TYPE STREQUAL "Debug")
   target_compile_definitions(mautlier PRIVATE MAUTLIER_DEBUG)

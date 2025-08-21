@@ -3,6 +3,7 @@
 #include "fen.h"
 #include "misc.h"
 #include "perft.h"
+#include "uci.h"
 
 #include <stdlib.h>
 
@@ -17,7 +18,6 @@ int cli_main() {
   MoveHistory_init(&move_history);
 
   while (1) {
-    printf("mautlier> ");
     if (fgets(input, sizeof(input), stdin) == NULL) {
       continue;
     }
@@ -35,6 +35,10 @@ int cli_main() {
     if (or_strcmp(command, 3, "exit", "quit", "q")) {
       printf("Exiting CLI...\n");
       break;
+    }
+
+    else if (strcmp(command, "uci") == 0) {
+      return uci_main();
     }
 
     else if (or_strcmp(command, 1, "help")) {
@@ -142,6 +146,23 @@ int cli_main() {
       char *board_str = board_to_debug_string(board);
       printf("%s\n", board_str);
       free(board_str);
+    }
+
+    else if (or_strcmp(command, 2, "bench", "benchmark")) {
+      char *depth_str = strtok_r(NULL, " ", &saveptr);
+      if (depth_str == NULL) {
+        printf("Error: Missing depth for bench\n");
+      } else {
+        char *endptr;
+        long depth = strtol(depth_str, &endptr, 10);
+        if (*endptr != '\0' || depth < 1) {
+          printf("Error: Invalid depth for perft\n");
+        } else {
+          printf("Running bench to depth %ld...\n", depth);
+          perft_divide(board, depth);
+        }
+      }
+
     }
 
     else {

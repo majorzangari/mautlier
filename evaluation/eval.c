@@ -3,11 +3,11 @@
 #include "board.h"
 #include "search.h"
 
-#define LAZY_EVAL_PAWN 1
-#define LAZY_EVAL_KNIGHT 3
-#define LAZY_EVAL_BISHOP 3
-#define LAZY_EVAL_ROOK 5
-#define LAZY_EVAL_QUEEN 9
+#define LAZY_EVAL_PAWN 100
+#define LAZY_EVAL_KNIGHT 300
+#define LAZY_EVAL_BISHOP 300
+#define LAZY_EVAL_ROOK 500
+#define LAZY_EVAL_QUEEN 900
 #define LAZY_EVAL_KING 0
 
 int lazy_evaluation(Board *board) {

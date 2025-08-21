@@ -7,7 +7,9 @@
 #include "board.h"
 #include "constants.h"
 #include "debug_printer.h"
+#include "misc.h"
 #include <stdlib.h>
+#include <string.h>
 
 static inline Move encode_move(int from_square, int to_square, int flags) {
   return (from_square << 10) | (to_square << 4) | flags;
@@ -413,4 +415,91 @@ char *move_to_string(Move move) {
            '1' + (to_square / 8), flags);
 
   return buffer;
+}
+
+static inline int generate_flags(Board *board, int start_index, int end_index,
+                                 char promo) {
+  Bitboard start_bb = (1ULL << start_index);
+  Bitboard end_bb = (1ULL << end_index);
+  if (board->pieces[board->to_move][PAWN] & start_bb) {
+    if ((BOARD_CURR_STATE(board).en_passant & end_bb)) {
+      return FLAGS_EN_PASSANT;
+    }
+    int double_push_offset = (board->to_move == WHITE) ? 16 : -16;
+    if (start_index + double_push_offset == end_index) {
+      return FLAGS_DOUBLE_PUSH;
+    }
+  }
+  int out_flags = FLAGS_NONE;
+  // clang-format off
+  if      (promo == 'n') { out_flags |= FLAGS_KNIGHT_PROMOTION; }
+  else if (promo == 'b') { out_flags |= FLAGS_BISHOP_PROMOTION; }
+  else if (promo == 'r') { out_flags |= FLAGS_ROOK_PROMOTION;   }
+  else if (promo == 'q') { out_flags |= FLAGS_QUEEN_PROMOTION;  }
+
+  if (board->piece_table[end_index] != PIECE_NONE) {
+    out_flags |= FLAGS_CAPTURE;
+  }
+  // clang-format on
+  return out_flags;
+}
+
+Move algebraic_to_move(Board *board, const char *str) {
+  size_t str_len = strlen(str);
+  if (str == NULL || str_len < 4) {
+    return NULL_MOVE; // Invalid move string
+  }
+
+  if (or_strcmp(str, 2, "e1g1", "e8g8")) {
+    return FLAGS_SHORT_CASTLE;
+  } else if (or_strcmp(str, 2, "e1c1", "e8c8")) {
+    return FLAGS_LONG_CASTLE;
+  }
+
+  int start_file = str[0] - 'a';
+  int start_rank = str[1] - '1';
+  int end_file = str[2] - 'a';
+  int end_rank = str[3] - '1';
+
+  int start_index = start_rank * 8 + (7 - start_file);
+  int end_index = end_rank * 8 + (7 - end_file);
+
+  int flags = generate_flags(board, start_index, end_index, str[4]);
+  return encode_move(start_index, end_index, flags);
+}
+
+char *move_to_algebraic(Move move, ToMove color) {
+  int start_index = move_from_square(move);
+  int end_index = move_to_square(move);
+  int flags = move_flags(move);
+  if (flags == FLAGS_SHORT_CASTLE) {
+    return (color == WHITE) ? "e1g1" : "e8g8";
+  } else if (flags == FLAGS_LONG_CASTLE) {
+    return (color == WHITE) ? "e1c1" : "e8c8";
+  }
+
+  static char out_buffer[6] = {0};
+  int start_file = start_index % 8;
+  int start_rank = start_index / 8;
+  int end_file = end_index % 8;
+  int end_rank = end_index / 8;
+
+  out_buffer[0] = 'a' + (7 - start_file);
+  out_buffer[1] = '1' + start_rank;
+  out_buffer[2] = 'a' + (7 - end_file);
+  out_buffer[3] = '1' + end_rank;
+
+  if (flags & FLAGS_KNIGHT_PROMOTION) {
+    out_buffer[4] = 'n';
+  } else if (flags & FLAGS_BISHOP_PROMOTION) {
+    out_buffer[4] = 'b';
+  } else if (flags & FLAGS_ROOK_PROMOTION) {
+    out_buffer[4] = 'r';
+  } else if (flags & FLAGS_QUEEN_PROMOTION) {
+    out_buffer[4] = 'q';
+  } else {
+    out_buffer[4] = '\0';
+  }
+
+  return out_buffer;
 }
