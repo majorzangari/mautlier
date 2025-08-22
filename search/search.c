@@ -23,14 +23,12 @@ static inline int lazy_search_negamax(Board *board, int depth, int alpha,
   int num_moves = generate_moves(board, moves);
   int result = NEG_INF_SCORE;
   for (int i = 0; i < num_moves; i++) {
-    char *prefen = board_to_fen(board);
 
     board_make_move(board, moves[i]);
 
     if (!board_valid(board)) {
       printf("Invalid board after making move %s\n", move_to_string(moves[i]));
       printf("Current board: %s\n", board_to_debug_string(board));
-      printf("Board before move: %s\n", prefen);
       exit(1); // TODO: remove
     }
 

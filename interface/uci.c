@@ -1,5 +1,6 @@
 #include "uci.h"
 #include "board.h"
+#include "diagnostic_tools.h"
 #include "fen.h"
 #include "move.h"
 #include "search.h"
@@ -21,43 +22,11 @@ void isready() {
   fflush(stdout);
 }
 
-void position(char *command, char *saveptr, Board *state) {
-  char *next_token = strtok_r(NULL, WHITESPACE, &saveptr);
-  if (strcmp(next_token, "startpos") == 0) {
-    Board *temp = init_default_board(); // icky icky
-    free(state);
-    state = temp;
-
-    next_token = strtok_r(NULL, WHITESPACE, &saveptr);
-  } else if (strcmp(next_token, "fen") == 0) {
-    char fen[100];
-    fen[0] = '\0';
-
-    next_token = strtok_r(NULL, WHITESPACE, &saveptr);
-    while (next_token != NULL && strcmp(next_token, "moves") != 0) {
-      strcat(fen, next_token);
-      strcat(fen, " ");
-      next_token = strtok_r(NULL, WHITESPACE, &saveptr);
-    }
-    fen[strlen(fen) - 1] = '\0';
-
-    Board *temp = fen_to_board(fen); // icky icky
-    free(state);
-    state = temp;
-  }
-
-  if (next_token != NULL && strcmp(next_token, "moves") == 0) {
-    next_token = strtok_r(NULL, WHITESPACE, &saveptr);
-    while (next_token != NULL) {
-      Move move = algebraic_to_move(state, next_token);
-      next_token = strtok_r(NULL, WHITESPACE, &saveptr);
-    }
-  }
-}
+void position(char *command, char *saveptr, Board *state) {}
 
 void go(char *command, char *saveptr, Board *state) {
   // TOOD: handle other args
-  Move best_move = lazy_search(state, 5);
+  Move best_move = lazy_search(state, 6);
   printf("bestmove %s\n", move_to_algebraic(best_move, state->to_move));
   fflush(stdout);
 }
@@ -83,12 +52,58 @@ int uci_main() {
         free(state);
       }
       state = temp;
+
     } else if (strcmp(command, "uci") == 0) {
       uci();
+
     } else if (strcmp(command, "isready") == 0) {
       isready();
+
     } else if (strcmp(command, "position") == 0) {
-      position(command, saveptr, state);
+      char *next_token = strtok_r(NULL, WHITESPACE, &saveptr);
+      if (strcmp(next_token, "startpos") == 0) {
+        Board *temp = init_default_board(); // icky icky
+        free(state);
+        state = temp;
+
+        next_token = strtok_r(NULL, WHITESPACE, &saveptr);
+      } else if (strcmp(next_token, "fen") == 0) {
+        char fen[100];
+        fen[0] = '\0';
+
+        next_token = strtok_r(NULL, WHITESPACE, &saveptr);
+        while (next_token != NULL && strcmp(next_token, "moves") != 0) {
+          strcat(fen, next_token);
+          strcat(fen, " ");
+          next_token = strtok_r(NULL, WHITESPACE, &saveptr);
+        }
+        fen[strlen(fen) - 1] = '\0';
+
+        Board *temp = fen_to_board(fen); // icky icky
+        free(state);
+        state = temp;
+      }
+      printf("next token: %s\n", next_token);
+      if (next_token != NULL && strcmp(next_token, "moves") == 0) {
+        next_token = strtok_r(NULL, WHITESPACE, &saveptr);
+        while (next_token != NULL) {
+          Move move = algebraic_to_move(state, next_token);
+          board_make_move(state, move);
+          next_token = strtok_r(NULL, WHITESPACE, &saveptr);
+        }
+      }
+
+    } else if (strcmp(command, "go") == 0) {
+      go(command, saveptr, state);
+    }
+
+    else if (strcmp(command, "d") == 0) {
+      if (state == NULL) {
+        printf(
+            "No board initialized. Use 'ucinewgame' or 'position' command.\n");
+      } else {
+        printf("%s\n", board_to_string(state));
+      }
     }
 
     else if (strcmp(command, "quit") == 0) {

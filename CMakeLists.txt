@@ -25,6 +25,8 @@ add_executable(mautlier
         interface/uci.c
 
         benchmark/benchmark.c
+
+        test/perft.c
 )
 
 target_include_directories(mautlier PRIVATE

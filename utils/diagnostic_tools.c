@@ -5,7 +5,7 @@
 #include <stdlib.h>
 
 char *square_to_string(int index) {
-  char *out = malloc(3);
+  static char out[3];
   out[0] = 'a' + (index % 8);
   out[1] = '1' + (index / 8);
   out[2] = '\0';

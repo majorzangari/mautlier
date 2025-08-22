@@ -489,13 +489,15 @@ char *move_to_algebraic(Move move, ToMove color) {
   out_buffer[2] = 'a' + (7 - end_file);
   out_buffer[3] = '1' + end_rank;
 
-  if (flags & FLAGS_KNIGHT_PROMOTION) {
+  int promo_flags = flags & PROMOTION_MASK;
+
+  if (promo_flags == FLAGS_KNIGHT_PROMOTION) {
     out_buffer[4] = 'n';
-  } else if (flags & FLAGS_BISHOP_PROMOTION) {
+  } else if (promo_flags == FLAGS_BISHOP_PROMOTION) {
     out_buffer[4] = 'b';
-  } else if (flags & FLAGS_ROOK_PROMOTION) {
+  } else if (promo_flags == FLAGS_ROOK_PROMOTION) {
     out_buffer[4] = 'r';
-  } else if (flags & FLAGS_QUEEN_PROMOTION) {
+  } else if (promo_flags == FLAGS_QUEEN_PROMOTION) {
     out_buffer[4] = 'q';
   } else {
     out_buffer[4] = '\0';

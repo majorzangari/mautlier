@@ -1,11 +1,13 @@
 #include "cli.h"
 #include "board.h"
+#include "diagnostic_tools.h"
 #include "fen.h"
 #include "misc.h"
 #include "perft.h"
 #include "uci.h"
 
 #include <stdlib.h>
+#include <string.h>
 
 DEFINE_STACK_TYPE(MoveHistory, Move, 2048)
 
@@ -18,6 +20,8 @@ int cli_main() {
   MoveHistory_init(&move_history);
 
   while (1) {
+    printf("mautlier> ");
+
     if (fgets(input, sizeof(input), stdin) == NULL) {
       continue;
     }
