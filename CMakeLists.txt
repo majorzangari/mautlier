@@ -14,6 +14,7 @@ add_executable(mautlier
         evaluation/eval.c
 
         search/search.c
+        search/transposition_table.c
 
         utils/diagnostic_tools.c
         utils/debug_printer.c

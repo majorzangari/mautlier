@@ -469,6 +469,10 @@ Move algebraic_to_move(Board *board, const char *str) {
 }
 
 char *move_to_algebraic(Move move, ToMove color) {
+  if (move == NULL_MOVE) {
+    return "0000";
+  }
+
   int start_index = move_from_square(move);
   int end_index = move_to_square(move);
   int flags = move_flags(move);

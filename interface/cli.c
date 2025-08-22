@@ -1,4 +1,5 @@
 #include "cli.h"
+#include "benchmark.h"
 #include "board.h"
 #include "diagnostic_tools.h"
 #include "fen.h"
@@ -163,7 +164,8 @@ int cli_main() {
           printf("Error: Invalid depth for perft\n");
         } else {
           printf("Running bench to depth %ld...\n", depth);
-          perft_divide(board, depth);
+          double mps = moves_per_second(depth);
+          printf("Moves per second: %.2f\n", moves_per_second);
         }
       }
 

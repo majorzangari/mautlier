@@ -27,8 +27,6 @@ int lazy_evaluation(Board *board) {
 
   int out = 0;
 
-  ToMove color = board->to_move;
-
   // clang-format off
   int pawn_diff   = count_set_bits(board->pieces[WHITE][PAWN])   - count_set_bits(board->pieces[BLACK][PAWN]);
   int knight_diff = count_set_bits(board->pieces[WHITE][KNIGHT]) - count_set_bits(board->pieces[BLACK][KNIGHT]);

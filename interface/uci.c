@@ -7,6 +7,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/time.h>
 
 #define WHITESPACE " \f\n\r\t\v"
 
@@ -22,13 +23,16 @@ void isready() {
   fflush(stdout);
 }
 
-void position(char *command, char *saveptr, Board *state) {}
+static inline long get_time_ms() { // TODO: remove copy paste
+  struct timeval t;
+  gettimeofday(&t, NULL);
+  return (t.tv_sec * 1000) + (t.tv_usec / 1000);
+}
 
 void go(char *command, char *saveptr, Board *state) {
-  // TOOD: handle other args
-  Move best_move = lazy_search(state, 6);
-  printf("bestmove %s\n", move_to_algebraic(best_move, state->to_move));
-  fflush(stdout);
+  SearchInfo info = {0};
+  info.endTime = get_time_ms() + 1000; // 10 seconds
+  search_position(state, &info);
 }
 
 int uci_main() {
@@ -83,8 +87,8 @@ int uci_main() {
         free(state);
         state = temp;
       }
-      printf("next token: %s\n", next_token);
       if (next_token != NULL && strcmp(next_token, "moves") == 0) {
+        printf("this shouldn't run\n");
         next_token = strtok_r(NULL, WHITESPACE, &saveptr);
         while (next_token != NULL) {
           Move move = algebraic_to_move(state, next_token);

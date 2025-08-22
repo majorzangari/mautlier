@@ -1,96 +1,180 @@
 #include "search.h"
+#include "board.h"
 #include "debug_printer.h"
 #include "diagnostic_tools.h"
 #include "eval.h"
 #include "fen.h"
 #include "misc.h"
 #include "move.h"
+#include "transposition_table.h"
 
 #include <stdlib.h>
+#include <string.h>
+#include <sys/time.h>
+#include <time.h>
 
 #define COLOR_MULTIPLIER(color) ((color) == WHITE ? 1 : -1)
 
-static inline int lazy_search_negamax(Board *board, int depth, int alpha,
-                                      int beta) {
-  DP_PRINTF("FUNC_TRACE", "lazy_search_negamax\n");
-  ToMove color = board->to_move;
+static inline long get_time_ms() {
+  struct timeval t;
+  gettimeofday(&t, NULL);
+  return (t.tv_sec * 1000) + (t.tv_usec / 1000);
+}
+
+#define MAX_PLY 64 // doubt im ever even hitting this
+
+typedef struct {
+  int score;
+  Move pv[MAX_PLY];
+  int pv_length;
+} SearchResults;
+
+static inline SearchResults search(Board *pos, int depth, int ply, int alpha,
+                                   int beta, SearchInfo *info) {
+  SearchResults results;
+  results.score = NEG_INF_SCORE;
+  results.pv_length = 0;
+
+  if (info->stopped) {
+    return results;
+  }
 
   if (depth <= 0) {
-    return COLOR_MULTIPLIER(color) * lazy_evaluation(board);
+    results.score = COLOR_MULTIPLIER(pos->to_move) * lazy_evaluation(pos);
+    return results;
+  }
+
+  info->nodes++;
+  if ((info->nodes & 4095) == 0) {
+    if (!info->infinite && info->endTime && get_time_ms() > info->endTime) {
+      info->stopped = 1;
+      return results;
+    }
+    if (info->stop) {
+      info->stopped = 1;
+      return results;
+    }
+  }
+
+  ToMove color = pos->to_move;
+
+  uint64_t hash = BOARD_CURR_STATE(pos).hash;
+  int alpha_orig = alpha;
+  TTEntry *tt_entry = tt_query(hash);
+  if (tt_entry && tt_entry->depth >= depth) {
+    if (tt_entry->type == TT_EXACT) {
+      results.score = tt_entry->score;
+      results.pv[0] = tt_entry->best_move;
+      results.pv_length = 1;
+      return results;
+    }
+    if (tt_entry->type == TT_LOWERBOUND) {
+      alpha = MAX(alpha, tt_entry->score);
+    } else if (tt_entry->type == TT_UPPERBOUND) {
+      beta = MIN(beta, tt_entry->score);
+    }
+
+    if (alpha >= beta) {
+      results.score = tt_entry->score;
+      results.pv[0] = tt_entry->best_move;
+      results.pv_length = 1;
+      return results;
+    }
   }
 
   Move moves[MAX_MOVES];
-  int num_moves = generate_moves(board, moves);
-  int result = NEG_INF_SCORE;
-  for (int i = 0; i < num_moves; i++) {
+  int num_moves = generate_moves(pos, moves);
+  Move best_move = NULL_MOVE;
 
-    board_make_move(board, moves[i]);
-
-    if (!board_valid(board)) {
-      printf("Invalid board after making move %s\n", move_to_string(moves[i]));
-      printf("Current board: %s\n", board_to_debug_string(board));
-      exit(1); // TODO: remove
+  if (tt_entry && tt_entry->best_move != NULL_MOVE) {
+    for (int i = 0; i < num_moves; i++) {
+      if (moves[i] == tt_entry->best_move) {
+        moves[i] = moves[0];
+        moves[0] = tt_entry->best_move;
+        break;
+      }
     }
+  }
 
-    if (king_in_check(board, color)) {
-      board_unmake_move(board, moves[i]);
+  for (int i = 0; i < num_moves; i++) {
+    Move move = moves[i];
+    board_make_move(pos, move);
+
+    if (king_in_check(pos, color)) {
+      board_unmake_move(pos, move);
       continue;
     }
 
-    int new_value = -lazy_search_negamax(board, depth - 1, -beta, -alpha);
+    SearchResults child_result =
+        search(pos, depth - 1, ply + 1, -beta, -alpha, info);
+    board_unmake_move(pos, move);
 
-    board_unmake_move(board, moves[i]);
+    int score = -child_result.score;
+    if (score > results.score) {
+      results.score = score;
+      best_move = move;
 
-    result = MAX(result, new_value);
+      results.pv[0] = move;
+      results.pv_length = child_result.pv_length + 1;
+      for (int j = 0; j < child_result.pv_length; j++)
+        results.pv[j + 1] = child_result.pv[j];
+    }
 
-    alpha = MAX(alpha, result);
+    alpha = MAX(alpha, results.score);
     if (alpha >= beta) {
       break;
     }
   }
-  return result;
+
+  TTEntryType type;
+  if (results.score <= alpha_orig)
+    type = TT_UPPERBOUND;
+  else if (results.score >= beta)
+    type = TT_LOWERBOUND;
+  else
+    type = TT_EXACT;
+
+  tt_store(hash, depth, results.score, type, best_move);
+
+  if (results.score == NEG_INF_SCORE) {
+    // no legal moves
+    if (king_in_check(pos, color)) {
+      results.score = NEG_INF_SCORE + ply; // checkmate
+    } else {
+      results.score = 0; // stalemate
+    }
+  }
+  return results;
 }
 
-Move lazy_search(Board *board, int depth) {
-  DP_PRINTF("FUNC_TRACE", "lazy_search\n");
-
-  if (board->game_state != GS_ONGOING) {
-    return NULL_MOVE; // game is over, no moves to make
-  }
-
-  Move moves[MAX_MOVES];
-  int num_moves = generate_moves(board, moves);
-  int best_score = NEG_INF_SCORE;
+void search_position(Board *board, SearchInfo *info) {
   Move best_move = NULL_MOVE;
-  ToMove color = board->to_move;
 
-  for (int i = 0; i < num_moves; i++) {
+  info->startTime = get_time_ms();
+  info->nodes = 0;
+  info->stopped = 0;
 
-    board_make_move(board, moves[i]);
-    if (king_in_check(board, color)) {
-      board_unmake_move(board, moves[i]);
-      continue;
-    }
-    int score =
-        -lazy_search_negamax(board, depth - 1, NEG_INF_SCORE, INF_SCORE);
-    board_unmake_move(board, moves[i]);
-
-    if (score > best_score) {
-      best_score = score;
-      best_move = moves[i];
-      if (best_score >= INF_SCORE) { // move straight wins, can stop searching,
-                                     // TODO: maybe remove?
-        return moves[i];
-      }
-    }
+  if (info->depth <= 0) {
+    info->depth = MAX_PLY; // effectively infinite
   }
-  if (best_move == NULL_MOVE) { // either checkmate or stalemate TODO:handle
-    if (king_in_check(board, color)) {
-      board->game_state = (color == WHITE) ? GS_BLACK_WON : GS_WHITE_WON;
-    } else {
-      board->game_state = GS_DRAW; // stalemate
+
+  for (int depth = 1; depth <= info->depth; depth++) {
+    SearchResults results =
+        search(board, depth, 0, NEG_INF_SCORE, INF_SCORE, info);
+
+    if (info->stopped) {
+      break;
     }
-    return NULL_MOVE;
+
+    best_move = results.pv[0];
+    int best_score = results.score;
+
+    long now = get_time_ms();
+    printf("info depth %d score cp %d time %ld nodes %ld\n", depth, best_score,
+           now - info->startTime, info->nodes);
+    fflush(stdout);
   }
-  return best_move;
+
+  printf("bestmove  %s\n", move_to_algebraic(best_move, board->to_move));
+  fflush(stdout);
 }
