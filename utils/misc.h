@@ -8,6 +8,8 @@
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
 
+#define COLOR_MULTIPLIER(color) ((color) == WHITE ? 1 : -1)
+
 bool or_strcmp(const char *str, int count, ...);
 
 // returns a malloced array of strings, last element is NULL

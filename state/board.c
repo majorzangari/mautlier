@@ -7,6 +7,7 @@
 #include "debug_printer.h"
 #include "fen.h"
 #include "hash.h"
+#include "misc.h"
 #include "move.h"
 
 #include <stdbool.h>
@@ -161,7 +162,7 @@ static inline bool is_special_draw(Board *board) {
   // repetition
   int identical_states = 1;
   int stack_size = GameStateDetailsStack_size(&board->game_state_stack);
-  for (int i = 1; i < stack_size; i++) {
+  for (int i = 1; i < MIN(stack_size, curr_state.halfmove_clock); i++) {
     GameStateDetails previous_state =
         GameStateDetailsStack_peek_down(&board->game_state_stack, i);
     if (previous_state.hash == curr_state.hash) {

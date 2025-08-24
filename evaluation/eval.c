@@ -1,14 +1,8 @@
 #include "eval.h"
 #include "bithelpers.h"
 #include "board.h"
+#include "misc.h"
 #include "search.h"
-
-#define LAZY_EVAL_PAWN 100
-#define LAZY_EVAL_KNIGHT 300
-#define LAZY_EVAL_BISHOP 300
-#define LAZY_EVAL_ROOK 500
-#define LAZY_EVAL_QUEEN 900
-#define LAZY_EVAL_KING 0
 
 int lazy_evaluation(Board *board) {
   if (board->game_state != GS_ONGOING) {
@@ -35,12 +29,11 @@ int lazy_evaluation(Board *board) {
   int queen_diff  = count_set_bits(board->pieces[WHITE][QUEEN])  - count_set_bits(board->pieces[BLACK][QUEEN]);
   // clang-format on
 
-  out += LAZY_EVAL_PAWN * pawn_diff;
-  out += LAZY_EVAL_KNIGHT * knight_diff;
-  out += LAZY_EVAL_BISHOP * bishop_diff;
-  out += LAZY_EVAL_ROOK * rook_diff;
-  out += LAZY_EVAL_QUEEN * queen_diff;
-
+  out += EVAL_PAWN * pawn_diff;
+  out += EVAL_KNIGHT * knight_diff;
+  out += EVAL_BISHOP * bishop_diff;
+  out += EVAL_ROOK * rook_diff;
+  out += EVAL_QUEEN * queen_diff;
   // printf("Lazy eval: %d\n", out);
   return out;
 }

@@ -31,7 +31,7 @@ static inline long get_time_ms() { // TODO: remove copy paste
 
 void go(char *command, char *saveptr, Board *state) {
   SearchInfo info = {0};
-  info.endTime = get_time_ms() + 1000; // 10 seconds
+  info.endTime = get_time_ms() + 10000; // 10 seconds
   search_position(state, &info);
 }
 

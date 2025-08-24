@@ -33,9 +33,9 @@ int generate_pawn_pushes(Bitboard pawns, Bitboard occupied, Move *moves,
     int from_square = (color == WHITE) ? to_square - 8 : to_square + 8;
     bool promote = (color == WHITE) ? to_square >= 56 : to_square <= 7;
     if (promote) {
-      *moves++ = encode_move(from_square, to_square, FLAGS_KNIGHT_PROMOTION);
-      *moves++ = encode_move(from_square, to_square, FLAGS_BISHOP_PROMOTION);
+      *moves++ = encode_move(from_square, to_square, FLAGS_QUEEN_PROMOTION);
       *moves++ = encode_move(from_square, to_square, FLAGS_ROOK_PROMOTION);
+      *moves++ = encode_move(from_square, to_square, FLAGS_KNIGHT_PROMOTION);
       *moves++ = encode_move(from_square, to_square, FLAGS_BISHOP_PROMOTION);
     } else {
       *moves++ = encode_move(from_square, to_square, FLAGS_PAWN_PUSH);
@@ -77,10 +77,10 @@ int generate_pawn_captures(Bitboard pawns, Bitboard enemy_occupied, Move *moves,
     bool promote = (color == WHITE) ? to_square >= 56 : to_square <= 7;
     if (promote) {
       // clang-format off
+      *moves++ = encode_move(from_square, to_square, FLAGS_QUEEN_PROMOTION_CAPTURE);
+      *moves++ = encode_move(from_square, to_square, FLAGS_ROOK_PROMOTION_CAPTURE);
       *moves++ = encode_move(from_square, to_square, FLAGS_KNIGHT_PROMOTION_CAPTURE);
       *moves++ = encode_move(from_square, to_square, FLAGS_BISHOP_PROMOTION_CAPTURE);
-      *moves++ = encode_move(from_square, to_square, FLAGS_ROOK_PROMOTION_CAPTURE);
-      *moves++ = encode_move(from_square, to_square, FLAGS_QUEEN_PROMOTION_CAPTURE);
       // clang-format on
       num_moves += 4;
     } else {
