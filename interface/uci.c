@@ -30,8 +30,74 @@ static inline long get_time_ms() { // TODO: remove copy paste
 }
 
 void go(char *command, char *saveptr, Board *state) {
+  int wtime = -1;
+  int btime = -1;
+  int winc = 0;
+  int binc = 0;
+  int movestogo = 0;
+  int movetime = -1;
+  int depth = -1;
+
+  char *token = strtok_r(NULL, WHITESPACE, &saveptr);
+  while (token != NULL) {
+    if (strcmp(token, "wtime") == 0) {
+      token = strtok_r(NULL, WHITESPACE, &saveptr);
+      if (token != NULL)
+        wtime = atoi(token);
+    } else if (strcmp(token, "btime") == 0) {
+      token = strtok_r(NULL, WHITESPACE, &saveptr);
+      if (token != NULL)
+        btime = atoi(token);
+    } else if (strcmp(token, "winc") == 0) {
+      token = strtok_r(NULL, WHITESPACE, &saveptr);
+      if (token != NULL)
+        winc = atoi(token);
+    } else if (strcmp(token, "binc") == 0) {
+      token = strtok_r(NULL, WHITESPACE, &saveptr);
+      if (token != NULL)
+        binc = atoi(token);
+    } else if (strcmp(token, "movestogo") == 0) {
+      token = strtok_r(NULL, WHITESPACE, &saveptr);
+      if (token != NULL)
+        movestogo = atoi(token);
+    } else if (strcmp(token, "movetime") == 0) {
+      token = strtok_r(NULL, WHITESPACE, &saveptr);
+      if (token != NULL)
+        movetime = atoi(token);
+    } else if (strcmp(token, "depth") == 0) {
+      token = strtok_r(NULL, WHITESPACE, &saveptr);
+      if (token != NULL)
+        depth = atoi(token);
+    }
+    token = strtok_r(NULL, WHITESPACE, &saveptr);
+  }
+
   SearchInfo info = {0};
-  info.endTime = get_time_ms() + 10000; // 10 seconds
+  if (movetime != -1) {
+    info.startTime = get_time_ms();
+    info.endTime = info.startTime + movetime;
+  } else if (wtime != -1 && btime != -1) {
+    int time = (state->to_move == WHITE) ? wtime : btime;
+    int inc = (state->to_move == WHITE) ? winc : binc;
+    if (movestogo != 0) {
+      time = time / movestogo;
+    } else {
+      time = time / 30; // assume 30 moves to end of game
+    }
+    time += inc;
+    time = time * 90 / 100;
+    if (time < 40) {
+      time = 40; // minimum time
+    }
+    info.startTime = get_time_ms();
+    info.endTime = info.startTime + time;
+  } else if (depth != -1) {
+    info.depth = depth;
+  } else {
+    info.startTime = get_time_ms();
+    info.endTime = info.startTime + 5000; // default to 5 seconds
+  }
+
   search_position(state, &info);
 }
 
@@ -88,7 +154,6 @@ int uci_main() {
         state = temp;
       }
       if (next_token != NULL && strcmp(next_token, "moves") == 0) {
-        printf("this shouldn't run\n");
         next_token = strtok_r(NULL, WHITESPACE, &saveptr);
         while (next_token != NULL) {
           Move move = algebraic_to_move(state, next_token);

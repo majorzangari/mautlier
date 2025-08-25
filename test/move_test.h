@@ -63,6 +63,7 @@ void test_move_making(char *pos) {
 
     check_compare(board_copy, board, "after unmaking move %s",
                   move_to_string(moves[i]));
+
     free(board_copy);
   }
 
@@ -72,15 +73,16 @@ void test_move_making(char *pos) {
 bool make_unmake_suite() {
   // clang-format off
   char positions[][256] = {
-    // "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",      // simple position
-    // "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR b KQkq - 0 1",      // simple black position
-    // "r3k2r/pppppppp/8/8/8/8/PPPPPPPP/R3K2R w KQkq - 0 1",            // castling shenanigans
-    // "r3k2r/pppppppp/8/8/8/8/PPPPPPPP/R3K2R b KQkq - 0 1",            // black castling shenanigans
-    // "rnbqkbnr/pppp1ppp/4p3/8/6P1/5P2/PPPPP2P/RNBQKBNR b KQkq - 0 2", // checkmate available
-    // "r1bqkb1r/2p1ppp1/p1p5/3p4/4P3/2PP1Q2/P1P2PPP/R1B1K1NR b KkQq - 1 0",
-    // "r1bqkb1r/2p1ppp1/p1p5/3p4/4P3/2PP1Q2/P1P2PPP/R1B1K1NR b KkQq - 1 0",
-    // "r1bqkb1r/2p1ppp1/p1p5/3p4/4PQ2/2PP4/PBP2PpP/R3K1NR b KQkq - 1 2",
-    "r1bqkbnr/ppp1pppp/n7/3pP3/8/8/PPPP1PPP/RNBQKBNR w KQkq d6 0 3"
+    "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",      // simple position
+    "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR b KQkq - 0 1",      // simple black position
+    "r3k2r/pppppppp/8/8/8/8/PPPPPPPP/R3K2R w KQkq - 0 1",            // castling shenanigans
+    "r3k2r/pppppppp/8/8/8/8/PPPPPPPP/R3K2R b KQkq - 0 1",            // black castling shenanigans
+    "rnbqkbnr/pppp1ppp/4p3/8/6P1/5P2/PPPPP2P/RNBQKBNR b KQkq - 0 2", // checkmate available
+    "r1bqkb1r/2p1ppp1/p1p5/3p4/4P3/2PP1Q2/P1P2PPP/R1B1K1NR b KkQq - 1 0",
+    "r1bqkb1r/2p1ppp1/p1p5/3p4/4P3/2PP1Q2/P1P2PPP/R1B1K1NR b KkQq - 1 0",
+    "r1bqkb1r/2p1ppp1/p1p5/3p4/4PQ2/2PP4/PBP2PpP/R3K1NR b KQkq - 1 2",
+    "r1bqkbnr/ppp1pppp/n7/3pP3/8/8/PPPP1PPP/RNBQKBNR w KQkq d6 0 3",
+    "r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1"
   };
   // clang-format on
   for (size_t i = 0; i < (sizeof(positions) / sizeof(positions[0])); i++) {

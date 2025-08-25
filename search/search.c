@@ -119,7 +119,7 @@ static inline SearchResults search(Board *pos, int depth, int ply, int alpha,
   if (tt_entry && tt_entry->depth >= depth) {
     if (tt_entry->type == TT_EXACT) {
       results.score = tt_entry->score;
-      results.pv[0] = tt_entry->best_move; // TODO: figure out rest of pv shit?
+      results.pv[0] = tt_entry->best_move; // TODO: verify exists?
       results.pv_length = 1;
       return results;
     }
@@ -182,6 +182,15 @@ static inline SearchResults search(Board *pos, int depth, int ply, int alpha,
     }
   }
 
+  if (results.score == NEG_INF_SCORE) {
+    // no legal moves
+    if (king_in_check(pos, color)) {
+      results.score = NEG_INF_SCORE + ply; // checkmate
+    } else {
+      results.score = 0; // stalemate
+    }
+  }
+
   TTEntryType type;
   if (results.score <= alpha_orig)
     type = TT_UPPERBOUND;
@@ -192,14 +201,6 @@ static inline SearchResults search(Board *pos, int depth, int ply, int alpha,
 
   tt_store(hash, depth, results.score, type, best_move);
 
-  if (results.score == NEG_INF_SCORE) {
-    // no legal moves
-    if (king_in_check(pos, color)) {
-      results.score = NEG_INF_SCORE + ply; // checkmate
-    } else {
-      results.score = 0; // stalemate
-    }
-  }
   return results;
 }
 

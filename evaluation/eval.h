@@ -13,6 +13,8 @@
 static const int piece_values[7] = {
     EVAL_PAWN, EVAL_KNIGHT, EVAL_BISHOP, EVAL_ROOK, EVAL_QUEEN, EVAL_KING, 0};
 
+void init_eval();
+
 int lazy_evaluation(Board *board);
 
 #endif

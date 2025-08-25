@@ -39,11 +39,13 @@ void perft_divide(Board *board, int depth) {
   int num_moves = generate_moves(board, moves);
   order_alphabetically(moves, num_moves);
 
+  int move_num = 0;
   for (int i = 0; i < num_moves; i++) {
     board_make_move(board, moves[i]);
     if (!king_in_check(board, OPPOSITE_COLOR(board->to_move))) {
       uint64_t nodes = perft(board, depth - 1);
-      printf("%d: %s: %lu nodes\n", i + 1, move_to_string(moves[i]), nodes);
+      printf("%d: %s: %lu nodes\n", ++move_num, move_to_string(moves[i]),
+             nodes);
       total_nodes += nodes;
     }
     board_unmake_move(board, moves[i]);

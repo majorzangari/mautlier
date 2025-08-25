@@ -1,19 +1,27 @@
 #include "cli.h"
 #include "constants.h"
 #include "debug_printer.h"
+#include "eval.h"
 #include "hash.h"
 #include "misc.h"
+#include "move_test.h"
 #include "uci.h"
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 
 int main(int argc, char **argv) {
   // setup
-  srand(0); // TODO: set to time
+  srand(time(0));
   init_data();
+  init_eval();
   init_zobrist();
+  if (!make_unmake_suite()) {
+    printf("fuck\n");
+    return 1;
+  }
 
   for (int i = 0; i < argc; i++) {
 

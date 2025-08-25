@@ -37,10 +37,10 @@ int generate_pawn_pushes(Bitboard pawns, Bitboard occupied, Move *moves,
       *moves++ = encode_move(from_square, to_square, FLAGS_ROOK_PROMOTION);
       *moves++ = encode_move(from_square, to_square, FLAGS_KNIGHT_PROMOTION);
       *moves++ = encode_move(from_square, to_square, FLAGS_BISHOP_PROMOTION);
+      num_moves += 4;
     } else {
       *moves++ = encode_move(from_square, to_square, FLAGS_PAWN_PUSH);
     }
-    num_moves++;
     pop_lsb(temp_single_dest);
   }
 
@@ -380,23 +380,25 @@ int generate_moves(Board *board, Move moves[MAX_MOVES]) {
   Bitboard same_side_occupied = board->occupied_by_color[board->to_move];
   Bitboard enemy_side_occupied = board->occupied_by_color[1 - board->to_move];
 
-  move_count += generate_knight_moves(knights, same_side_occupied,
-                                      enemy_side_occupied, moves);
-  move_count += generate_pawn_pushes(pawns, board->occupied, moves + move_count,
-                                     board->to_move);
   move_count += generate_pawn_captures(pawns, enemy_side_occupied,
                                        moves + move_count, board->to_move);
   move_count += generate_en_passant(pawns, gsd.en_passant, board->to_move,
                                     moves + move_count);
-  move_count += generate_king_moves(kings, same_side_occupied,
-                                    enemy_side_occupied, moves + move_count);
+
+  move_count += generate_castling(board, moves + move_count, gsd);
+
+  move_count += generate_pawn_pushes(pawns, board->occupied, moves + move_count,
+                                     board->to_move);
+  move_count += generate_knight_moves(knights, same_side_occupied,
+                                      enemy_side_occupied, moves + move_count);
   move_count +=
       generate_rook_moves(rooks | queens, board->occupied, same_side_occupied,
                           enemy_side_occupied, moves + move_count);
   move_count += generate_bishop_moves(bishops | queens, board->occupied,
                                       same_side_occupied, enemy_side_occupied,
                                       moves + move_count);
-  move_count += generate_castling(board, moves + move_count, gsd);
+  move_count += generate_king_moves(kings, same_side_occupied,
+                                    enemy_side_occupied, moves + move_count);
   return move_count;
 }
 
