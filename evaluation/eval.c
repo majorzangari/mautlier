@@ -174,22 +174,27 @@ int eg_table[2][6][64];
 
 // converts my weird index into one that works with the tables above
 int convert_to_traditional_index(int index) {
-  return 63 - index;
-} // TODO: verify this is right
+  int rank = index / 8;
+  int file = index % 8;
+  return (7 - rank) * 8 + file;
+}
 
 void init_eval() {
   for (Piece piece = PAWN; piece <= KING; piece++) {
     for (int sq = 0; sq < 64; sq++) {
-      int traditional_index = convert_to_traditional_index(sq);
-      mg_table[WHITE][piece][sq] =
-          mg_value[piece] + mg_pesto_table[piece][traditional_index];
-      eg_table[WHITE][piece][sq] =
-          eg_value[piece] + eg_pesto_table[piece][traditional_index];
+      int pesto_index = convert_to_traditional_index(sq);
 
+      // White pieces use Pesto table directly
+      mg_table[WHITE][piece][sq] =
+          mg_value[piece] + mg_pesto_table[piece][pesto_index];
+      eg_table[WHITE][piece][sq] =
+          eg_value[piece] + eg_pesto_table[piece][pesto_index];
+
+      // Black pieces mirror the table vertically using ^56
       mg_table[BLACK][piece][sq] =
-          mg_value[piece] + mg_pesto_table[piece][FLIP(traditional_index)];
+          mg_value[piece] + mg_pesto_table[piece][pesto_index ^ 56];
       eg_table[BLACK][piece][sq] =
-          eg_value[piece] + eg_pesto_table[piece][FLIP(traditional_index)];
+          eg_value[piece] + eg_pesto_table[piece][pesto_index ^ 56];
     }
   }
 }

@@ -7,16 +7,15 @@
 #define INF_SCORE 0xFFFFFFF
 #define NEG_INF_SCORE -0xFFFFFFF
 
-typedef struct {
-  int depth;
-  long startTime;
-  long endTime;
-  long nodes;
-  int infinite;
-  int stop;
-  int stopped;
-} SearchInfo;
+#define MAX_PLY 64 // doubt im ever even hitting this
 
-void search_position(Board *board, SearchInfo *info);
+typedef struct {
+  int max_depth; // max depth to search, or 0 for no max depth
+  long max_duration_ms;
+  long max_nodes; // max nodes to search, or 0 for no max nodes
+  int infinite;
+} SearchRequestInfo;
+
+void search_position(Board *board, SearchRequestInfo *info);
 
 #endif

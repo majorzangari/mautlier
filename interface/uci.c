@@ -37,6 +37,7 @@ void go(char *command, char *saveptr, Board *state) {
   int movestogo = 0;
   int movetime = -1;
   int depth = -1;
+  int infinite = 0;
 
   char *token = strtok_r(NULL, WHITESPACE, &saveptr);
   while (token != NULL) {
@@ -66,17 +67,17 @@ void go(char *command, char *saveptr, Board *state) {
         movetime = atoi(token);
     } else if (strcmp(token, "depth") == 0) {
       token = strtok_r(NULL, WHITESPACE, &saveptr);
-      if (token != NULL)
+      if (token != NULL) {
         depth = atoi(token);
+      }
+    } else if (strcmp(token, "infinite") == 0) {
+      infinite = 1;
     }
     token = strtok_r(NULL, WHITESPACE, &saveptr);
   }
 
-  SearchInfo info = {0};
-  if (movetime != -1) {
-    info.startTime = get_time_ms();
-    info.endTime = info.startTime + movetime;
-  } else if (wtime != -1 && btime != -1) {
+  SearchRequestInfo info = {0};
+  if (wtime != -1 && btime != -1) {
     int time = (state->to_move == WHITE) ? wtime : btime;
     int inc = (state->to_move == WHITE) ? winc : binc;
     if (movestogo != 0) {
@@ -89,13 +90,11 @@ void go(char *command, char *saveptr, Board *state) {
     if (time < 40) {
       time = 40; // minimum time
     }
-    info.startTime = get_time_ms();
-    info.endTime = info.startTime + time;
+    info.max_duration_ms = time;
   } else if (depth != -1) {
-    info.depth = depth;
+    info.max_depth = depth;
   } else {
-    info.startTime = get_time_ms();
-    info.endTime = info.startTime + 5000; // default to 5 seconds
+    info.max_duration_ms = 5000; // default to 5 seconds
   }
 
   search_position(state, &info);
@@ -171,7 +170,7 @@ int uci_main() {
         printf(
             "No board initialized. Use 'ucinewgame' or 'position' command.\n");
       } else {
-        printf("%s\n", board_to_string(state));
+        printf("%s\n", board_to_debug_string(state));
       }
     }
 

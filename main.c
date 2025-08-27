@@ -18,10 +18,6 @@ int main(int argc, char **argv) {
   init_data();
   init_eval();
   init_zobrist();
-  if (!make_unmake_suite()) {
-    printf("fuck\n");
-    return 1;
-  }
 
   for (int i = 0; i < argc; i++) {
 

@@ -32,6 +32,8 @@
 #define ZOBRIST_CR_BLACK_SHORT 2
 #define ZOBRIST_CR_BLACK_LONG 3
 
+#define ZOBRIST_HASH(pos) BOARD_CURR_STATE(pos).hash
+
 // MUST BE CALLED BEFORE USING ANY HASH FUNCTIONS
 void init_zobrist();
 

@@ -7,6 +7,7 @@
 #include "board.h"
 #include "constants.h"
 #include "debug_printer.h"
+#include "diagnostic_tools.h"
 #include "misc.h"
 #include <stdlib.h>
 #include <string.h>
@@ -368,6 +369,9 @@ int generate_castling(Board *board, Move *moves, GameStateDetails details) {
 int generate_moves(Board *board, Move moves[MAX_MOVES]) {
   DP_PRINTF("FUNC_TRACE", "generate_moves\n");
   int move_count = 0;
+  if (board->game_state != GS_ONGOING) {
+    return 0;
+  }
 
   GameStateDetails gsd = BOARD_CURR_STATE(board);
 
