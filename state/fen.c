@@ -208,9 +208,8 @@ char *board_to_fen(Board *board) {
     out[index++] = '-';
   else {
     int ep_index = lsb_index(curr_state.en_passant);
-    char *square_str = square_to_string(ep_index);
-    strcpy(out + index, square_to_string(ep_index));
-    free(square_str);
+    char *sq = square_to_string(ep_index);
+    strcpy(out + index, sq);
     index += 2;
   }
 

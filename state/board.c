@@ -355,8 +355,10 @@ void board_make_move(Board *board, Move move) {
   new_state.captured_piece = PIECE_NONE;
   new_state.hash = toggle_turn(BOARD_CURR_STATE(board).hash);
 
-  int old_ep = lsb_index(BOARD_CURR_STATE(board).en_passant);
-  new_state.hash = toggle_en_passant(new_state.hash, old_ep);
+  if (BOARD_CURR_STATE(board).en_passant) {
+    int old_ep = lsb_index(BOARD_CURR_STATE(board).en_passant);
+    new_state.hash = toggle_en_passant(new_state.hash, old_ep);
+  }
 
   switch (flags) {
   case FLAGS_PAWN_PUSH:
@@ -368,8 +370,8 @@ void board_make_move(Board *board, Move move) {
     new_state.halfmove_clock = 0;
     int ep_shift =
         (board->to_move == WHITE) ? (to_square - 8) : (to_square + 8);
-    new_state.en_passant = 1ULL << ep_shift;
-    new_state.hash = toggle_en_passant(new_state.hash, new_state.en_passant);
+  new_state.en_passant = 1ULL << ep_shift;
+  new_state.hash = toggle_en_passant(new_state.hash, ep_shift);
     break;
   case FLAGS_SHORT_CASTLE:
     short_castle(board, &new_state);
@@ -490,7 +492,7 @@ void board_update_occupied(Board *board) {
 }
 
 void board_update_piece_table(Board *board) {
-  for (size_t i = 0; i < 63; i++) {
+  for (size_t i = 0; i < 64; i++) {
     board->piece_table[i] = PIECE_NONE;
   }
 

@@ -77,7 +77,11 @@ void go(char *command, char *saveptr, Board *state) {
   }
 
   SearchRequestInfo info = {0};
-  if (wtime != -1 && btime != -1) {
+  if (movetime != -1) {
+    info.max_duration_ms = movetime;
+  } else if (infinite) {
+    info.infinite = 1;
+  } else if (wtime != -1 && btime != -1) {
     int time = (state->to_move == WHITE) ? wtime : btime;
     int inc = (state->to_move == WHITE) ? winc : binc;
     if (movestogo != 0) {

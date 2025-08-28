@@ -41,6 +41,7 @@ int generate_pawn_pushes(Bitboard pawns, Bitboard occupied, Move *moves,
       num_moves += 4;
     } else {
       *moves++ = encode_move(from_square, to_square, FLAGS_PAWN_PUSH);
+      num_moves++;
     }
     pop_lsb(temp_single_dest);
   }
@@ -478,6 +479,9 @@ char *move_to_algebraic(Move move, ToMove color) {
   if (move == NULL_MOVE) {
     return "0000";
   }
+  if (move == 0) {
+    return "0000";
+  }
 
   int start_index = move_from_square(move);
   int end_index = move_to_square(move);
@@ -514,4 +518,26 @@ char *move_to_algebraic(Move move, ToMove color) {
   }
 
   return out_buffer;
+}
+
+bool is_capture(Move move) {
+  int flags = move_flags(move);
+  return (flags & FLAGS_CAPTURE) && flags != FLAGS_LONG_CASTLE;
+}
+
+int is_promotion(Move move) {
+  int flags = move_flags(move);
+
+  switch (flags & PROMOTION_MASK) {
+  case FLAGS_QUEEN_PROMOTION:
+    return 4;
+  case FLAGS_ROOK_PROMOTION:
+    return 3;
+  case FLAGS_BISHOP_PROMOTION:
+    return 2;
+  case FLAGS_KNIGHT_PROMOTION:
+    return 1;
+  default:
+    return 0;
+  }
 }

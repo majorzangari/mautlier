@@ -15,6 +15,7 @@ add_executable(mautlier
 
         search/search.c
         search/transposition_table.c
+        search/move_ordering.c
 
         utils/diagnostic_tools.c
         utils/debug_printer.c
@@ -42,4 +43,8 @@ target_include_directories(mautlier PRIVATE
 )
 if (CMAKE_BUILD_TYPE STREQUAL "Debug")
   target_compile_definitions(mautlier PRIVATE MAUTLIER_DEBUG)
+  add_compile_options(-g -O1 -fno-omit-frame-pointer -fsanitize=address)
+  add_link_options(-fsanitize=address)
+  add_compile_options(-fsanitize=undefined)
+  add_link_options(-fsanitize=undefined)
 endif()

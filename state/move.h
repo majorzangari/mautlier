@@ -51,4 +51,7 @@ Move algebraic_to_move(Board *board, const char *str);
 
 char *move_to_algebraic(Move move, ToMove color);
 
+bool is_capture(Move move);
+int is_promotion(Move move);
+
 #endif // MOVE_H

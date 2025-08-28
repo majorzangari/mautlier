@@ -7,6 +7,7 @@
 #include "hash.h"
 #include "misc.h"
 #include "move.h"
+#include "move_ordering.h"
 #include "transposition_table.h"
 
 #include <stdlib.h>
@@ -42,6 +43,7 @@ static inline SearchResults search(Board *pos, int depth, int ply, int alpha,
     return results;
   int has_legal = 0;
   int orig_alpha = alpha;
+  int orig_beta = beta;
 
   uint64_t hash = ZOBRIST_HASH(pos);
 
@@ -56,27 +58,8 @@ static inline SearchResults search(Board *pos, int depth, int ply, int alpha,
 
   TTEntry *tt_entry = tt_query(hash);
 
-  // Check TT
-  if (tt_entry != NULL && tt_entry->depth >= depth) {
-    if (tt_entry->type == TT_EXACT) {
-      results.score = get_adjusted_score(tt_entry, ply);
-      results.best_move = tt_entry->best_move;
-      return results;
-    } else if (tt_entry->type == TT_LOWERBOUND) {
-      alpha = MAX(alpha, tt_entry->score);
-    } else {
-      beta = MIN(beta, tt_entry->score);
-    }
-
-    if (alpha >= beta) {
-      results.score = get_adjusted_score(tt_entry, ply);
-      results.best_move = tt_entry->best_move;
-      return results;
-    }
-  }
-
   // Check depth
-  if (depth == 0) {
+  if (depth == 0 || pos->game_state != GS_ONGOING) {
     results.score = COLOR_MULTIPLIER(color) * lazy_evaluation(pos);
     results.best_move = NULL_MOVE;
     return results;
@@ -85,23 +68,56 @@ static inline SearchResults search(Board *pos, int depth, int ply, int alpha,
   Move moves[MAX_MOVES];
   int num_moves = generate_moves(pos, moves);
 
-  // put tt move first
-  if (tt_entry != NULL && tt_entry->best_move != NULL_MOVE) {
+  // Check TT
+  if (tt_entry != NULL && tt_entry->depth >= depth) {
+    bool found_move = false;
     for (int i = 0; i < num_moves; i++) {
       if (moves[i] == tt_entry->best_move) {
-        moves[i] = moves[0];
-        moves[0] = tt_entry->best_move;
+        found_move = true;
         break;
+      }
+    }
+
+    if (found_move) {
+      if (tt_entry->type == TT_EXACT) {
+        results.score = get_adjusted_score(tt_entry, ply);
+        results.best_move = tt_entry->best_move;
+        return results;
+      } else if (tt_entry->type == TT_LOWERBOUND) {
+        int tt_score = get_adjusted_score(tt_entry, ply);
+        alpha = MAX(alpha, tt_score);
+      } else {
+        int tt_score = get_adjusted_score(tt_entry, ply);
+        beta = MIN(beta, tt_score);
+      }
+
+      if (alpha >= beta) {
+        results.score = get_adjusted_score(tt_entry, ply);
+        results.best_move = tt_entry->best_move;
+        return results;
       }
     }
   }
 
+  Move tt_move = (tt_entry != NULL) ? tt_entry->best_move : NULL_MOVE;
+
+  int move_scores[MAX_MOVES];
+  score_moves(pos, moves, move_scores, num_moves, tt_move, ply);
+
   // recursion loop
   for (int i = 0; i < num_moves; i++) {
-    board_make_move(pos, moves[i]);
+    int move_index =
+        pick_next_move(moves, move_scores, num_moves, i, num_moves);
+    if (move_index < 0 || move_index >= num_moves) {
+      printf("what the fucky fucky this happened");
+      fflush(stdout);
+      continue;
+    }
+    Move move = moves[move_index];
+    board_make_move(pos, move);
 
     if (king_in_check(pos, color)) {
-      board_unmake_move(pos, moves[i]);
+      board_unmake_move(pos, move);
       continue;
     }
 
@@ -111,11 +127,11 @@ static inline SearchResults search(Board *pos, int depth, int ply, int alpha,
         search(pos, depth - 1, ply + 1, -beta, -alpha, info);
     int score = -child_results.score;
 
-    board_unmake_move(pos, moves[i]);
+    board_unmake_move(pos, move);
 
     if (score > results.score) {
       results.score = score;
-      results.best_move = moves[i];
+      results.best_move = move;
     }
 
     if (results.score > alpha) {
@@ -123,6 +139,11 @@ static inline SearchResults search(Board *pos, int depth, int ply, int alpha,
     }
 
     if (alpha >= beta) {
+      if (!is_capture(move) && !is_promotion(move)) {
+        add_killer(move, ply);
+        add_history(color, move, depth);
+        // TODO: set countermove
+      }
       break; // beta cutoff
     }
   }
@@ -131,11 +152,11 @@ static inline SearchResults search(Board *pos, int depth, int ply, int alpha,
     if (king_in_check(pos, color)) {
       results.score = NEG_INF_SCORE + ply; // checkmate
     } else {
-      results.score = 0;
+      results.score = 0;  
     }
   }
 
-  tt_store(hash, depth, results.score, orig_alpha, beta, ply,
+  tt_store(hash, depth, results.score, orig_alpha, orig_beta, ply,
            results.best_move);
 
   return results;
@@ -154,13 +175,15 @@ void search_position(Board *board, SearchRequestInfo *info) {
   long start_time_ms = get_time_ms();
   Move best_move = NULL_MOVE;
   for (int depth = 1; depth <= MAX_PLY; depth++) {
+    if (search_info.stopped)
+      break;
     SearchResults results =
         search(board, depth, 0, NEG_INF_SCORE, INF_SCORE, &search_info);
 
-    if (!search_info.stopped) {
+    if (!search_info.stopped || best_move == NULL_MOVE) {
       best_move = results.best_move;
-      printf("info score cp %d depth time %d, %ld pv %s\n", results.score,
-             depth, get_time_ms() - start_time_ms,
+      printf("info score cp %d depth %d time %ld pv %s\n", results.score, depth,
+             get_time_ms() - start_time_ms,
              move_to_algebraic(results.best_move, board->to_move));
       fflush(stdout);
     }
