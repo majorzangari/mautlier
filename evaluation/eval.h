@@ -10,6 +10,8 @@
 #define EVAL_QUEEN 900
 #define EVAL_KING 20000
 
+#define MATE_THRESHOLD MATE_SCORE - MAX_PLY
+
 static const int piece_values[7] = {
     EVAL_PAWN, EVAL_KNIGHT, EVAL_BISHOP, EVAL_ROOK, EVAL_QUEEN, EVAL_KING, 0};
 

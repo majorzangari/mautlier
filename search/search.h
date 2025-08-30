@@ -7,6 +7,9 @@
 #define INF_SCORE 0xFFFFFFF
 #define NEG_INF_SCORE -0xFFFFFFF
 
+#define MATE_SCORE 0xFFFFF
+#define NEG_MATE_SCORE -0xFFFFF
+
 #define MAX_PLY 64 // doubt im ever even hitting this
 
 typedef struct {

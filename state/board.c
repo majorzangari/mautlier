@@ -23,17 +23,25 @@ static inline void check_rook_castling_right_change(Board *board,
                                                     GameStateDetails *state,
                                                     uint8_t square) {
   if (square == 0) {
-    state->castling_rights &= ~CR_WHITE_SHORT;
-    state->hash = toggle_castling_rights(state->hash, ZOBRIST_CR_WHITE_SHORT);
+    if (state->castling_rights & CR_WHITE_SHORT) {
+      state->castling_rights &= ~CR_WHITE_SHORT;
+      state->hash = toggle_castling_rights(state->hash, ZOBRIST_CR_WHITE_SHORT);
+    }
   } else if (square == 7) {
-    state->castling_rights &= ~CR_WHITE_LONG;
-    state->hash = toggle_castling_rights(state->hash, ZOBRIST_CR_WHITE_LONG);
+    if (state->castling_rights & CR_WHITE_LONG) {
+      state->castling_rights &= ~CR_WHITE_LONG;
+      state->hash = toggle_castling_rights(state->hash, ZOBRIST_CR_WHITE_LONG);
+    }
   } else if (square == 56) {
-    state->castling_rights &= ~CR_BLACK_SHORT;
-    state->hash = toggle_castling_rights(state->hash, ZOBRIST_CR_BLACK_SHORT);
+    if (state->castling_rights & CR_BLACK_SHORT) {
+      state->castling_rights &= ~CR_BLACK_SHORT;
+      state->hash = toggle_castling_rights(state->hash, ZOBRIST_CR_BLACK_SHORT);
+    }
   } else if (square == 63) {
-    state->castling_rights &= ~CR_BLACK_LONG;
-    state->hash = toggle_castling_rights(state->hash, ZOBRIST_CR_BLACK_LONG);
+    if (state->castling_rights & CR_BLACK_LONG) {
+      state->castling_rights &= ~CR_BLACK_LONG;
+      state->hash = toggle_castling_rights(state->hash, ZOBRIST_CR_BLACK_LONG);
+    }
   }
 }
 
@@ -48,13 +56,25 @@ static inline void manage_move_castling_rights(Board *board,
     check_rook_castling_right_change(board, state, from_square);
   } else if (piece == KING) {
     if (color == WHITE) {
+      if (state->castling_rights & CR_WHITE_SHORT) {
+        state->hash =
+            toggle_castling_rights(state->hash, ZOBRIST_CR_WHITE_SHORT);
+      }
+      if (state->castling_rights & CR_WHITE_LONG) {
+        state->hash =
+            toggle_castling_rights(state->hash, ZOBRIST_CR_WHITE_LONG);
+      }
       state->castling_rights &= ~(CR_WHITE_SHORT | CR_WHITE_LONG);
-      state->hash = toggle_castling_rights(state->hash, ZOBRIST_CR_WHITE_SHORT);
-      state->hash = toggle_castling_rights(state->hash, ZOBRIST_CR_WHITE_LONG);
     } else {
+      if (state->castling_rights & CR_BLACK_SHORT) {
+        state->hash =
+            toggle_castling_rights(state->hash, ZOBRIST_CR_BLACK_SHORT);
+      }
+      if (state->castling_rights & CR_BLACK_LONG) {
+        state->hash =
+            toggle_castling_rights(state->hash, ZOBRIST_CR_BLACK_LONG);
+      }
       state->castling_rights &= ~(CR_BLACK_SHORT | CR_BLACK_LONG);
-      state->hash = toggle_castling_rights(state->hash, ZOBRIST_CR_BLACK_SHORT);
-      state->hash = toggle_castling_rights(state->hash, ZOBRIST_CR_BLACK_LONG);
     }
   }
 }
@@ -192,12 +212,14 @@ static inline void short_castle(Board *board, GameStateDetails *new_state) {
 
     current_hash = move_piece_hash(current_hash, KING, 3, 1, WHITE);
     current_hash = move_piece_hash(current_hash, ROOK, 0, 2, WHITE);
-    current_hash = toggle_castling_rights(current_hash, ZOBRIST_CR_WHITE_SHORT);
+    if (new_state->castling_rights & CR_WHITE_SHORT) {
+      current_hash =
+          toggle_castling_rights(current_hash, ZOBRIST_CR_WHITE_SHORT);
+    }
     if (new_state->castling_rights & CR_WHITE_LONG) {
       current_hash =
           toggle_castling_rights(current_hash, ZOBRIST_CR_WHITE_LONG);
     }
-
     new_state->castling_rights &= ~(CR_WHITE_SHORT | CR_WHITE_LONG);
   } else {
     board->pieces[BLACK][KING] ^= 0xA00000000000000ULL;
@@ -218,7 +240,6 @@ static inline void short_castle(Board *board, GameStateDetails *new_state) {
       current_hash =
           toggle_castling_rights(current_hash, ZOBRIST_CR_BLACK_LONG);
     }
-
     new_state->castling_rights &= ~(CR_BLACK_SHORT | CR_BLACK_LONG);
   }
   new_state->hash = current_hash;
@@ -267,12 +288,14 @@ static inline void long_castle(Board *board, GameStateDetails *new_state) {
 
     current_hash = move_piece_hash(current_hash, KING, 3, 5, WHITE);
     current_hash = move_piece_hash(current_hash, ROOK, 7, 4, WHITE);
-    current_hash = toggle_castling_rights(current_hash, ZOBRIST_CR_WHITE_LONG);
+    if (new_state->castling_rights & CR_WHITE_LONG) {
+      current_hash =
+          toggle_castling_rights(current_hash, ZOBRIST_CR_WHITE_LONG);
+    }
     if (new_state->castling_rights & CR_WHITE_SHORT) {
       current_hash =
           toggle_castling_rights(current_hash, ZOBRIST_CR_WHITE_SHORT);
     }
-
     new_state->castling_rights &= ~(CR_WHITE_SHORT | CR_WHITE_LONG);
   } else {
     board->pieces[BLACK][KING] ^= 0x2800000000000000ULL;
@@ -288,7 +311,10 @@ static inline void long_castle(Board *board, GameStateDetails *new_state) {
 
     current_hash = move_piece_hash(current_hash, KING, 59, 61, BLACK);
     current_hash = move_piece_hash(current_hash, ROOK, 63, 60, BLACK);
-    current_hash = toggle_castling_rights(current_hash, ZOBRIST_CR_BLACK_LONG);
+    if (new_state->castling_rights & CR_BLACK_LONG) {
+      current_hash =
+          toggle_castling_rights(current_hash, ZOBRIST_CR_BLACK_LONG);
+    }
     if (new_state->castling_rights & CR_BLACK_SHORT) {
       current_hash =
           toggle_castling_rights(current_hash, ZOBRIST_CR_BLACK_SHORT);
@@ -370,8 +396,8 @@ void board_make_move(Board *board, Move move) {
     new_state.halfmove_clock = 0;
     int ep_shift =
         (board->to_move == WHITE) ? (to_square - 8) : (to_square + 8);
-  new_state.en_passant = 1ULL << ep_shift;
-  new_state.hash = toggle_en_passant(new_state.hash, ep_shift);
+    new_state.en_passant = 1ULL << ep_shift;
+    new_state.hash = toggle_en_passant(new_state.hash, ep_shift);
     break;
   case FLAGS_SHORT_CASTLE:
     short_castle(board, &new_state);

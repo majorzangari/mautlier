@@ -41,10 +41,40 @@ target_include_directories(mautlier PRIVATE
     ${CMAKE_SOURCE_DIR}/test
     ${CMAKE_SOURCE_DIR}/benchmark
 )
+
 if (CMAKE_BUILD_TYPE STREQUAL "Debug")
-  target_compile_definitions(mautlier PRIVATE MAUTLIER_DEBUG)
-  add_compile_options(-g -O1 -fno-omit-frame-pointer -fsanitize=address)
-  add_link_options(-fsanitize=address)
-  add_compile_options(-fsanitize=undefined)
-  add_link_options(-fsanitize=undefined)
+    target_compile_definitions(mautlier PRIVATE MAUTLIER_DEBUG)
+endif()
+
+if(CMAKE_BUILD_TYPE STREQUAL "BallerRelease")
+    message(STATUS "Configuring mautlier for MAXIMUM SPEED (no regard for size or compile time)")
+
+    target_compile_options(mautlier PRIVATE
+        -O3
+        -Ofast
+        -march=native
+        -mtune=native
+        -flto
+        -fomit-frame-pointer
+        -funroll-loops
+        -finline-functions
+        -fprefetch-loop-arrays
+        -fstrict-aliasing
+        -ffast-math
+        -ftree-vectorize
+        -DNDEBUG
+    )
+
+    include(CheckIPOSupported)
+    check_ipo_supported(RESULT ipo_supported OUTPUT ipo_error)
+    if(ipo_supported)
+        set_property(TARGET mautlier PROPERTY INTERPROCEDURAL_OPTIMIZATION TRUE)
+    else()
+        message(WARNING "IPO/LTO not supported: ${ipo_error}")
+    endif()
+
+    target_link_options(mautlier PRIVATE
+      -flto
+      -Wl,-O3
+    )
 endif()

@@ -10,6 +10,7 @@
 #include "move_ordering.h"
 #include "transposition_table.h"
 
+#include <assert.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/time.h>
@@ -38,7 +39,7 @@ static inline SearchResults search(Board *pos, int depth, int ply, int alpha,
                                    int beta, SearchInfo *info) {
 
   ToMove color = pos->to_move;
-  SearchResults results = {.score = NEG_INF_SCORE, .best_move = NULL_MOVE};
+  SearchResults results = {.score = -INF_SCORE, .best_move = NULL_MOVE};
   if (info->stopped)
     return results;
   int has_legal = 0;
@@ -47,8 +48,7 @@ static inline SearchResults search(Board *pos, int depth, int ply, int alpha,
 
   uint64_t hash = ZOBRIST_HASH(pos);
 
-  info->nodes_remaining--;
-  if ((info->nodes_remaining & 4095) == 0) {
+  if ((++info->nodes_remaining & 4095) == 0) {
     if (!info->infinite && info->end_time_ms &&
         get_time_ms() > info->end_time_ms) {
       info->stopped = 1;
@@ -79,15 +79,14 @@ static inline SearchResults search(Board *pos, int depth, int ply, int alpha,
     }
 
     if (found_move) {
+      int tt_score = get_adjusted_score(tt_entry, ply);
       if (tt_entry->type == TT_EXACT) {
-        results.score = get_adjusted_score(tt_entry, ply);
+        results.score = tt_score;
         results.best_move = tt_entry->best_move;
         return results;
       } else if (tt_entry->type == TT_LOWERBOUND) {
-        int tt_score = get_adjusted_score(tt_entry, ply);
         alpha = MAX(alpha, tt_score);
       } else {
-        int tt_score = get_adjusted_score(tt_entry, ply);
         beta = MIN(beta, tt_score);
       }
 
@@ -108,11 +107,7 @@ static inline SearchResults search(Board *pos, int depth, int ply, int alpha,
   for (int i = 0; i < num_moves; i++) {
     int move_index =
         pick_next_move(moves, move_scores, num_moves, i, num_moves);
-    if (move_index < 0 || move_index >= num_moves) {
-      printf("what the fucky fucky this happened");
-      fflush(stdout);
-      continue;
-    }
+    assert(move_index >= 0 && move_index < num_moves); // TODO: remove
     Move move = moves[move_index];
     board_make_move(pos, move);
 
@@ -142,7 +137,6 @@ static inline SearchResults search(Board *pos, int depth, int ply, int alpha,
       if (!is_capture(move) && !is_promotion(move)) {
         add_killer(move, ply);
         add_history(color, move, depth);
-        // TODO: set countermove
       }
       break; // beta cutoff
     }
@@ -150,14 +144,14 @@ static inline SearchResults search(Board *pos, int depth, int ply, int alpha,
 
   if (!has_legal) {
     if (king_in_check(pos, color)) {
-      results.score = NEG_INF_SCORE + ply; // checkmate
+      results.score = -MATE_SCORE + ply; // checkmate
     } else {
-      results.score = 0;  
+      results.score = 0;
     }
+  } else {
+    tt_store(hash, depth, results.score, orig_alpha, orig_beta, ply,
+             results.best_move);
   }
-
-  tt_store(hash, depth, results.score, orig_alpha, orig_beta, ply,
-           results.best_move);
 
   return results;
 }
@@ -167,7 +161,7 @@ void search_position(Board *board, SearchRequestInfo *info) {
   SearchInfo search_info = {
       .max_depth = info->max_depth,
       .end_time_ms = end_time_ms,
-      .nodes_remaining = info->max_nodes,
+      .nodes_remaining = 0, // TODO: change
       .infinite = info->infinite,
       .stopped = 0,
   };
@@ -178,12 +172,13 @@ void search_position(Board *board, SearchRequestInfo *info) {
     if (search_info.stopped)
       break;
     SearchResults results =
-        search(board, depth, 0, NEG_INF_SCORE, INF_SCORE, &search_info);
+        search(board, depth, 0, -INF_SCORE, INF_SCORE, &search_info);
 
     if (!search_info.stopped || best_move == NULL_MOVE) {
       best_move = results.best_move;
-      printf("info score cp %d depth %d time %ld pv %s\n", results.score, depth,
-             get_time_ms() - start_time_ms,
+      printf("info score cp %d depth %d time %ld nodes %ld pv %s\n",
+             results.score, depth, get_time_ms() - start_time_ms,
+             search_info.nodes_remaining,
              move_to_algebraic(results.best_move, board->to_move));
       fflush(stdout);
     }

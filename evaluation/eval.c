@@ -199,13 +199,80 @@ void init_eval() {
   }
 }
 
+// TODO:tune
+#define ISOLATED_PAWN_PENALTY 20
+#define DOUBLED_PAWN_PENALTY 20
+#define PASSED_PAWN_BONUS 35
+
+static inline Bitboard adjacent_files(int file) {
+  Bitboard mask = 0;
+  if (file > 0) {
+    mask |= (FILE_H << (file - 1));
+  }
+  if (file < 7) {
+    mask |= (FILE_H << (file + 1));
+  }
+  return mask;
+}
+
+static inline Bitboard same_file_ahead(int file, int index, ToMove color) {
+  Bitboard mask = (FILE_H << file);
+  if (color == WHITE) {
+    mask &= ~((1ULL << index) - 1);
+  } else {
+    mask &= ((1ULL << index) - 1);
+  }
+  return mask & ~(1ULL << index); // TODO: last operation might not be necessary
+}
+
+static inline Bitboard blocking_pawns_mask(int file, int index, ToMove color) {
+  Bitboard front = same_file_ahead(file, index, color);
+  Bitboard right = (file > 0) ? same_file_ahead(file - 1, index, color) : 0;
+  Bitboard left = (file < 7) ? same_file_ahead(file + 1, index, color) : 0;
+  return front | right | left;
+}
+
+static inline int evaluate_pawn_structure(Board *board, ToMove color) {
+  int score = 0;
+  Bitboard pawns = board->pieces[color][PAWN];
+
+  while (pawns) {
+    int sq = lsb_index(pawns);
+    pop_lsb(pawns);
+
+    int file = sq % 8;
+    int rank = sq / 8;
+
+    if (!(board->pieces[color][PAWN] & adjacent_files(file))) {
+      // Isolated pawn
+      score -= ISOLATED_PAWN_PENALTY;
+    }
+
+    if (board->pieces[color][PAWN] & same_file_ahead(file, sq, color)) {
+      // Doubled pawn
+      score -= DOUBLED_PAWN_PENALTY;
+    }
+
+    // TODO: passed
+    if (!(board->pieces[OPPOSITE_COLOR(color)][PAWN] &
+          blocking_pawns_mask(file, sq, color))) {
+      // Passed pawn
+      score += PASSED_PAWN_BONUS + (color == WHITE ? rank : (7 - rank)) * 10;
+    }
+    // TODO: backward
+    // TODO: connected
+  }
+
+  return score;
+}
+
 int lazy_evaluation(Board *board) {
   if (board->game_state != GS_ONGOING) {
     switch (board->game_state) {
     case GS_WHITE_WON:
-      return INF_SCORE;
+      return MATE_SCORE;
     case GS_BLACK_WON:
-      return NEG_INF_SCORE;
+      return -MATE_SCORE;
     case GS_DRAW:
       return 0;
     case GS_ONGOING:
@@ -243,5 +310,9 @@ int lazy_evaluation(Board *board) {
     mgPhase = 24;
   }
   int egPhase = 24 - mgPhase;
-  return (mg_score * mgPhase + eg_score * egPhase) / 24;
+
+  int pesto_score = (mg_score * mgPhase + eg_score * egPhase) / 24;
+  int pawn_structure_score = evaluate_pawn_structure(board, WHITE) -
+                             evaluate_pawn_structure(board, BLACK);
+  return pesto_score + pawn_structure_score;
 }

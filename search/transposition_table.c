@@ -1,18 +1,21 @@
 #include "transposition_table.h"
 
+#include "eval.h"
 #include "search.h"
 #include <stdlib.h>
 
-TTEntry lt_table[TT_SIZE];
-
-#define MATE_THRESHOLD INF_SCORE - MAX_PLY
+static TTEntry lt_table[TT_SIZE];
 
 int get_adjusted_score(TTEntry *entry, int curr_ply) {
   int score = entry->score;
-  int stored_ply = entry->ply;
-  if (abs(score) >= MATE_THRESHOLD) {
-    return score + (score > 0 ? stored_ply - curr_ply : curr_ply - stored_ply);
+
+  if (score >= MATE_THRESHOLD) {
+    return score + (curr_ply - entry->ply);
+  } else if (score <= -MATE_THRESHOLD) {
+    return score - (curr_ply - entry->ply);
   }
+
+  // non-mate score, return as-is
   return score;
 }
 
