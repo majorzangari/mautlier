@@ -266,6 +266,66 @@ static inline int evaluate_pawn_structure(Board *board, ToMove color) {
   return score;
 }
 
+static inline int evaluate_mobility(Board *board) {
+  int score = 0;
+
+  const int mobility_value[6] = {0, 4, 3, 2, 1, 0};
+
+  for (ToMove color = WHITE; color <= BLACK; color++) {
+    for (Piece piece = KNIGHT; piece <= QUEEN; piece++) {
+      Bitboard bitboard = board->pieces[color][piece];
+      while (bitboard) {
+        int sq = lsb_index(bitboard);
+        pop_lsb(bitboard);
+        Bitboard attacks = generate_attacks(board, piece, sq, color);
+        int mobility = count_set_bits(attacks);
+        if (color == WHITE) {
+          score += mobility * mobility_value[piece];
+        } else {
+          score -= mobility * mobility_value[piece];
+        }
+      }
+    }
+  }
+
+  return score;
+}
+
+#define FRONT_PAWN_BONUS 20
+#define FRONT_SIDE_PAWN_BONUS 10
+
+static inline int evaluate_king_safety(Board *pos, ToMove color) {
+  int score = 0;
+
+  int king_index = lsb_index(pos->pieces[WHITE][KING]);
+
+  int file = king_index % 8;
+
+  // checks pawn in front of king + castled
+  if (file < 3 || file > 4) {
+    // castled
+    int front_pawn = king_index + (color == WHITE ? 8 : -8);
+    int front_right_pawn = front_pawn + 1;
+    int front_left_pawn = front_pawn - 1;
+    if (pos->pieces[color][PAWN] & (1ULL << front_pawn)) {
+      score += FRONT_PAWN_BONUS;
+    }
+    if (pos->pieces[color][PAWN] & (1ULL << front_right_pawn)) {
+      score += FRONT_SIDE_PAWN_BONUS;
+    }
+    if (pos->pieces[color][PAWN] & (1ULL << front_left_pawn)) {
+      score += FRONT_SIDE_PAWN_BONUS;
+    }
+  } else {
+    // uncastled
+    score -= 20;
+  }
+
+  // TODO: add more king safety checks
+
+  return score;
+}
+
 int lazy_evaluation(Board *board) {
   if (board->game_state != GS_ONGOING) {
     switch (board->game_state) {
@@ -314,5 +374,9 @@ int lazy_evaluation(Board *board) {
   int pesto_score = (mg_score * mgPhase + eg_score * egPhase) / 24;
   int pawn_structure_score = evaluate_pawn_structure(board, WHITE) -
                              evaluate_pawn_structure(board, BLACK);
-  return pesto_score + pawn_structure_score;
+  int mobility_score = evaluate_mobility(board);
+  int king_safety_score =
+      evaluate_king_safety(board, WHITE) - evaluate_king_safety(board, BLACK);
+  return pesto_score + pawn_structure_score + mobility_score +
+         king_safety_score;
 }

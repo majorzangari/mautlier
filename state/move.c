@@ -9,6 +9,7 @@
 #include "debug_printer.h"
 #include "diagnostic_tools.h"
 #include "misc.h"
+#include <assert.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -539,5 +540,28 @@ int is_promotion(Move move) {
     return 1;
   default:
     return 0;
+  }
+}
+
+Bitboard generate_attacks(Board *pos, Piece piece, int square, ToMove color) {
+  switch (piece) {
+  case PAWN:
+    assert(false);
+    return 0; // Pawns handled separately
+  case KNIGHT:
+    return knight_moves[square] & ~(pos->occupied_by_color[color]);
+  case BISHOP:
+    return get_bishop_attack_board(square, pos->occupied,
+                                   pos->occupied_by_color[color]);
+  case ROOK:
+    return get_rook_attack_board(square, pos->occupied,
+                                 pos->occupied_by_color[color]);
+  case QUEEN:
+    return get_bishop_attack_board(square, pos->occupied,
+                                   pos->occupied_by_color[color]) |
+           get_rook_attack_board(square, pos->occupied,
+                                 pos->occupied_by_color[color]);
+  case KING:
+    return king_moves[square] & ~(pos->occupied_by_color[color]);
   }
 }

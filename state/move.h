@@ -54,4 +54,6 @@ char *move_to_algebraic(Move move, ToMove color);
 bool is_capture(Move move);
 int is_promotion(Move move);
 
+Bitboard generate_attacks(Board *pos, Piece piece, int square, ToMove color);
+
 #endif // MOVE_H
