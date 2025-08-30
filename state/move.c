@@ -564,4 +564,5 @@ Bitboard generate_attacks(Board *pos, Piece piece, int square, ToMove color) {
   case KING:
     return king_moves[square] & ~(pos->occupied_by_color[color]);
   }
+  return 0ULL;
 }

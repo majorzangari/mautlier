@@ -11,6 +11,23 @@
 
 #define WHITESPACE " \f\n\r\t\v"
 
+FILE *book = NULL;
+
+int init_book(const char *path) {
+  book = fopen(path, "rb");
+  if (!book) {
+    fprintf(stderr, "Failed to open book file: %s\n", path);
+    return 0;
+  }
+  return 1;
+}
+
+void close_book() {
+  if (book)
+    fclose(book);
+  book = NULL;
+}
+
 void uci() {
   printf("id name %s %s\n", ID_NAME, ID_VERSION);
   printf("id author %s\n", ID_AUTHOR);
@@ -101,7 +118,7 @@ void go(char *command, char *saveptr, Board *state) {
     info.max_duration_ms = 5000; // default to 5 seconds
   }
 
-  search_position(state, &info);
+  search_position(state, &info, book);
 }
 
 int uci_main() {
@@ -120,6 +137,9 @@ int uci_main() {
     if (command == NULL) {
       continue;
     } else if (strcmp(command, "ucinewgame") == 0) {
+      if (book == NULL) {
+        init_book("book/Cerebellum3Merge.bin"); // TODO: make uci argument
+      }
       Board *temp = init_default_board();
       if (state != NULL) {
         free(state);
@@ -179,6 +199,9 @@ int uci_main() {
     }
 
     else if (strcmp(command, "quit") == 0) {
+      if (book != NULL) {
+        close_book();
+      }
       exit_code = EXIT_SUCCESS;
       break;
     }

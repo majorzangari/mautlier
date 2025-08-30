@@ -3,14 +3,12 @@
 #include "bithelpers.h"
 #include "board.h"
 #include "hash.h"
-#include "polyglot.h"
+#include "polyglot_constants.h"
 
 uint64_t piece_pos_hash[12][64];
 uint64_t side_hash;
 uint64_t castling_hash[4];
 uint64_t en_passant_hash[8];
-
-uint64_t rand64() { return ((uint64_t)rand() << 32) | rand(); }
 
 void init_zobrist() {
   for (int i = 0; i < 12; i++) {

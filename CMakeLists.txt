@@ -4,31 +4,32 @@ project(mautlier C)
 set(CMAKE_C_STANDARD 11)
 
 add_executable(mautlier 
-        main.c
+    main.c
 
-        state/board.c
-        state/fen.c
-        state/move.c
-        state/constants.c
+    state/board.c
+    state/fen.c
+    state/move.c
+    state/constants.c
 
-        evaluation/eval.c
+    evaluation/eval.c
 
-        search/search.c
-        search/transposition_table.c
-        search/move_ordering.c
+    search/search.c
+    search/transposition_table.c
+    search/move_ordering.c
 
-        utils/diagnostic_tools.c
-        utils/debug_printer.c
-        utils/misc.c
+    utils/diagnostic_tools.c
+    utils/debug_printer.c
+    utils/misc.c
 
-        hash/hash.c
+    hash/hash.c
+    hash/polyglot.c
 
-        interface/cli.c
-        interface/uci.c
+    interface/cli.c
+    interface/uci.c
 
-        benchmark/benchmark.c
+    benchmark/benchmark.c
 
-        test/perft.c
+    test/perft.c
 )
 
 target_include_directories(mautlier PRIVATE
@@ -65,12 +66,16 @@ if(CMAKE_BUILD_TYPE STREQUAL "BallerRelease")
         -DNDEBUG
     )
 
-    include(CheckIPOSupported)
-    check_ipo_supported(RESULT ipo_supported OUTPUT ipo_error)
-    if(ipo_supported)
-        set_property(TARGET mautlier PROPERTY INTERPROCEDURAL_OPTIMIZATION TRUE)
+    if(NOT CMAKE_C_COMPILER_TARGET)
+        include(CheckIPOSupported)
+        check_ipo_supported(RESULT ipo_supported OUTPUT ipo_error)
+        if(ipo_supported)
+            set_property(TARGET mautlier PROPERTY INTERPROCEDURAL_OPTIMIZATION TRUE)
+        else()
+            message(WARNING "IPO/LTO not supported: ${ipo_error}")
+        endif()
     else()
-        message(WARNING "IPO/LTO not supported: ${ipo_error}")
+        message(STATUS "Skipping IPO/LTO check for cross-compiling")
     endif()
 
     target_link_options(mautlier PRIVATE
@@ -78,3 +83,5 @@ if(CMAKE_BUILD_TYPE STREQUAL "BallerRelease")
       -Wl,-O3
     )
 endif()
+
+file(COPY ${CMAKE_SOURCE_DIR}/book DESTINATION ${CMAKE_BINARY_DIR})

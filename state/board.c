@@ -449,6 +449,9 @@ void board_make_move(Board *board, Move move) {
                                     // to not figure out yet
   }
   board->to_move = OPPOSITE_COLOR(board->to_move);
+  if (board->to_move == WHITE) {
+    board->full_move_clock++;
+  }
 }
 
 void board_unmake_move(Board *board, Move move) {
@@ -497,6 +500,9 @@ void board_unmake_move(Board *board, Move move) {
   }
   board->game_state = GS_ONGOING;
   board->to_move = OPPOSITE_COLOR(board->to_move);
+  if (board->to_move == BLACK) {
+    board->full_move_clock--;
+  }
 }
 
 bool board_valid(Board *board) {

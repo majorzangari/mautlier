@@ -1,18 +1,15 @@
 #include "search.h"
 #include "board.h"
-#include "debug_printer.h"
-#include "diagnostic_tools.h"
 #include "eval.h"
-#include "fen.h"
 #include "hash.h"
 #include "misc.h"
 #include "move.h"
 #include "move_ordering.h"
+#include "polyglot.h"
 #include "transposition_table.h"
 
 #include <assert.h>
-#include <stdlib.h>
-#include <string.h>
+#include <stdio.h>
 #include <sys/time.h>
 #include <time.h>
 
@@ -156,7 +153,8 @@ static inline SearchResults search(Board *pos, int depth, int ply, int alpha,
   return results;
 }
 
-void search_position(Board *board, SearchRequestInfo *info) {
+void search_position(Board *board, SearchRequestInfo *info,
+                     FILE *opening_book) {
   long end_time_ms = get_time_ms() + info->max_duration_ms;
   SearchInfo search_info = {
       .max_depth = info->max_depth,
@@ -165,6 +163,24 @@ void search_position(Board *board, SearchRequestInfo *info) {
       .infinite = info->infinite,
       .stopped = 0,
   };
+
+  uint64_t hash = ZOBRIST_HASH(board);
+
+  if (opening_book != NULL && board->full_move_clock < 10) {
+    printf("info string looking for book move\n");
+    fflush(stdout);
+    Move move = lookup_book_move(hash, opening_book, board);
+    if (move != NULL_MOVE) {
+      printf("info score cp 0 depth 0 time 0 nodes 0 pv %s\n",
+             move_to_algebraic(move, board->to_move));
+      printf("bestmove %s\n", move_to_algebraic(move, board->to_move));
+      fflush(stdout);
+      return;
+    } else {
+      printf("info string no book move found\n");
+      fflush(stdout);
+    }
+  }
 
   long start_time_ms = get_time_ms();
   Move best_move = NULL_MOVE;

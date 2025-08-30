@@ -19,6 +19,6 @@ typedef struct {
   int infinite;
 } SearchRequestInfo;
 
-void search_position(Board *board, SearchRequestInfo *info);
+void search_position(Board *board, SearchRequestInfo *info, FILE *book);
 
 #endif

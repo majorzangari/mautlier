@@ -104,6 +104,7 @@ typedef struct Board {
   ToMove to_move;
   Piece piece_table[64];
   GameStateDetailsStack game_state_stack;
+  int full_move_clock;
 } Board;
 
 #define BOARD_CURR_STATE(board)                                                \

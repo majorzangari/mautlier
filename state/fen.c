@@ -156,6 +156,9 @@ Board *fen_to_board(char *input_fen) {
   char *halfmove_clock_data = strtok_r(NULL, " ", &saveptr);
   details.halfmove_clock = atoi(halfmove_clock_data);
 
+  char *fullmove_clock_data = strtok_r(NULL, " ", &saveptr);
+  out->full_move_clock = atoi(fullmove_clock_data);
+
   details.captured_piece = PIECE_NONE;
 
   GameStateDetailsStack_init(&out->game_state_stack);
@@ -228,9 +231,8 @@ char *board_to_fen(Board *board) {
     index += 2;
   }
 
-  index +=
-      snprintf(out + index, buffer_size - index, " %d %d",
-               curr_state.halfmove_clock, board->game_state_stack.top / 2 + 1);
+  index += snprintf(out + index, buffer_size - index, " %d %d",
+                    curr_state.halfmove_clock, board->full_move_clock);
   out[index] = '\0';
   return out;
 }
