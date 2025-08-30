@@ -377,6 +377,7 @@ int lazy_evaluation(Board *board) {
   int mobility_score = evaluate_mobility(board);
   int king_safety_score =
       evaluate_king_safety(board, WHITE) - evaluate_king_safety(board, BLACK);
+  int tempo_score = (board->to_move == WHITE) ? 10 : -10;
   return pesto_score + pawn_structure_score + mobility_score +
-         king_safety_score;
+         king_safety_score + tempo_score;
 }

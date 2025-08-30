@@ -3,6 +3,7 @@
 #include "bithelpers.h"
 #include "board.h"
 #include "hash.h"
+#include "polyglot.h"
 
 uint64_t piece_pos_hash[12][64];
 uint64_t side_hash;
@@ -14,18 +15,23 @@ uint64_t rand64() { return ((uint64_t)rand() << 32) | rand(); }
 void init_zobrist() {
   for (int i = 0; i < 12; i++) {
     for (int j = 0; j < 64; j++) {
-      piece_pos_hash[i][j] = rand64();
+      int adjusted_piece = (i % 2 == 0) ? i + 1 : i - 1;
+
+      int file = 7 - (j % 8);
+      int rank = j / 8;
+      int r64_index = 64 * adjusted_piece + 8 * rank + file;
+      piece_pos_hash[i][j] = polyglot_randoms[r64_index];
     }
   }
 
-  side_hash = rand64();
+  side_hash = polyglot_randoms[POLY_SIDE_OFFSET];
 
   for (int i = 0; i < 4; i++) {
-    castling_hash[i] = rand64();
+    castling_hash[i] = polyglot_randoms[POLY_CASTLE_OFFSET + i];
   }
 
   for (int i = 0; i < 8; i++) {
-    en_passant_hash[i] = rand64();
+    en_passant_hash[i] = polyglot_randoms[POLY_EP_OFFSET + (7 - i)];
   }
 }
 
@@ -36,13 +42,13 @@ uint64_t zobrist_hash(const Board *board) {
       Bitboard piece_bb = board->pieces[side][piece];
       while (piece_bb) {
         int square = lsb_index(piece_bb);
-        hash ^= piece_pos_hash[piece + side * 6][square];
+        hash ^= piece_pos_hash[piece * 2 + side][square];
         pop_lsb(piece_bb);
       }
     }
   }
 
-  if (board->to_move == BLACK) {
+  if (board->to_move == WHITE) {
     hash ^= side_hash;
   }
 
@@ -62,7 +68,7 @@ uint64_t zobrist_hash(const Board *board) {
 }
 
 uint64_t toggle_piece(uint64_t hash, Piece piece, int square, ToMove to_move) {
-  return hash ^ piece_pos_hash[piece + to_move * 6][square];
+  return hash ^ piece_pos_hash[piece * 2 + to_move][square];
 }
 
 uint64_t toggle_castling_rights(uint64_t hash, int castling_rights) {

@@ -381,7 +381,7 @@ void board_make_move(Board *board, Move move) {
   new_state.captured_piece = PIECE_NONE;
   new_state.hash = toggle_turn(BOARD_CURR_STATE(board).hash);
 
-  if (BOARD_CURR_STATE(board).en_passant) {
+  if (BOARD_CURR_STATE(board).en_passant != 0) {
     int old_ep = lsb_index(BOARD_CURR_STATE(board).en_passant);
     new_state.hash = toggle_en_passant(new_state.hash, old_ep);
   }
@@ -396,8 +396,25 @@ void board_make_move(Board *board, Move move) {
     new_state.halfmove_clock = 0;
     int ep_shift =
         (board->to_move == WHITE) ? (to_square - 8) : (to_square + 8);
-    new_state.en_passant = 1ULL << ep_shift;
-    new_state.hash = toggle_en_passant(new_state.hash, ep_shift);
+    // TODO: check if ep is legal
+    int ep_file = ep_shift % 8;
+    if (board->to_move == WHITE) {
+      if ((ep_file > 0 &&
+           board->pieces[BLACK][PAWN] & (1ULL << (to_square - 1))) ||
+          (ep_file < 7 &&
+           board->pieces[BLACK][PAWN] & (1ULL << (to_square + 1)))) {
+        new_state.hash = toggle_en_passant(new_state.hash, ep_shift);
+        new_state.en_passant = 1ULL << ep_shift;
+      }
+    } else {
+      if ((ep_file > 0 &&
+           board->pieces[WHITE][PAWN] & (1ULL << (to_square - 1))) ||
+          (ep_file < 7 &&
+           board->pieces[WHITE][PAWN] & (1ULL << (to_square + 1)))) {
+        new_state.hash = toggle_en_passant(new_state.hash, ep_shift);
+        new_state.en_passant = 1ULL << ep_shift;
+      }
+    }
     break;
   case FLAGS_SHORT_CASTLE:
     short_castle(board, &new_state);

@@ -136,7 +136,22 @@ Board *fen_to_board(char *input_fen) {
   details.castling_rights = parse_castling_rights(castling_rights_data);
 
   char *en_passant_data = strtok_r(NULL, " ", &saveptr);
-  details.en_passant = square_to_bit(en_passant_data);
+  int en_passant = square_to_bit(en_passant_data);
+
+  int ep_file = en_passant % 8;
+  int ep_shift = lsb_index(en_passant);
+
+  if (out->to_move == BLACK) {
+    if ((ep_file > 0 && out->pieces[BLACK][PAWN] & (1ULL << (ep_shift + 7))) ||
+        (ep_file < 7 && out->pieces[BLACK][PAWN] & (1ULL << (ep_shift + 9)))) {
+      details.en_passant = 1ULL << ep_shift;
+    }
+  } else {
+    if ((ep_file > 0 && out->pieces[WHITE][PAWN] & (1ULL << (ep_shift - 9))) ||
+        (ep_file < 7 && out->pieces[WHITE][PAWN] & (1ULL << (ep_shift - 7)))) {
+      details.en_passant = 1ULL << ep_shift;
+    }
+  }
 
   char *halfmove_clock_data = strtok_r(NULL, " ", &saveptr);
   details.halfmove_clock = atoi(halfmove_clock_data);
