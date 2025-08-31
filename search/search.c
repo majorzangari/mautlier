@@ -216,13 +216,6 @@ static inline SearchResults search(Board *pos, int depth, int ply, int alpha,
       results.best_move = move;
     }
 
-    // TODO: make sure this is safe
-    if (results.score >= MATE_THRESHOLD) {
-      tt_store(hash, depth, results.score, orig_alpha, orig_beta, ply,
-               results.best_move);
-      return results;
-    }
-
     if (results.score > alpha) {
       alpha = results.score;
     }
@@ -263,7 +256,7 @@ void search_position(Board *board, SearchRequestInfo *info,
 
   uint64_t hash = ZOBRIST_HASH(board);
 
-  if (opening_book != NULL && board->full_move_clock < 10) {
+  if (opening_book != NULL && board->full_move_clock < 20) {
     printf("info string looking for book move\n");
     fflush(stdout);
     Move move = lookup_book_move(hash, opening_book, board);
