@@ -215,10 +215,10 @@ char *board_to_fen(Board *board) {
   GameStateDetails curr_state = BOARD_CURR_STATE(board);
 
   // clang-format off
-  if ((curr_state.castling_rights | CR_WHITE_SHORT) > 0) out[index++] = 'K';
-  if ((curr_state.castling_rights | CR_BLACK_SHORT) > 0) out[index++] = 'k';
-  if ((curr_state.castling_rights | CR_WHITE_LONG) > 0) out[index++] = 'Q';
-  if ((curr_state.castling_rights | CR_BLACK_LONG) > 0) out[index++] = 'q';
+  if ((curr_state.castling_rights & CR_WHITE_SHORT) > 0) out[index++] = 'K';
+  if ((curr_state.castling_rights & CR_BLACK_SHORT) > 0) out[index++] = 'k';
+  if ((curr_state.castling_rights & CR_WHITE_LONG) > 0) out[index++] = 'Q';
+  if ((curr_state.castling_rights & CR_BLACK_LONG) > 0) out[index++] = 'q';
   // clang-format on
 
   out[index++] = ' ';

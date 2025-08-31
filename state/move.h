@@ -13,8 +13,8 @@ typedef struct Board Board;
 
 #define MAX_MOVES 256
 
-#define move_from_square(move) ((move) >> 10)
-#define move_to_square(move) ((move >> 4 & 0x3f))
+#define move_from_square(move) (((move) >> 10) & 0x3f)
+#define move_to_square(move) (((move) >> 4) & 0x3f)
 #define move_flags(move) ((move) & 0x0f)
 
 #define FLAGS_NONE 0
@@ -39,7 +39,7 @@ typedef struct Board Board;
 
 typedef uint16_t Move;
 
-#define NULL_MOVE 11
+#define NULL_MOVE 0
 
 int generate_moves(Board *board, Move moves[MAX_MOVES]);
 

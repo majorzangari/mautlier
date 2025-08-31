@@ -7,8 +7,8 @@
 #define HISTORY_MAX 16384
 
 static Move killer[MAX_PLY][KILLERS_PER_PLY];
-static int history[2][64][64]; // side, from, to
-// static Move counter_move[2][6][64]; // side, piece, to
+static int history[2][64][64];      // side, from, to
+static Move counter_move[2][6][64]; // side, piece, from
 
 static const int mvv_lva[6][6] = { // victim, attacker
     /* Victim P */ {105, 205, 305, 405, 505, 605},

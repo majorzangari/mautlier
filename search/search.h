@@ -4,11 +4,9 @@
 #include "move.h"
 
 // inf might be a misnomer, just a big number to trump other factors
-#define INF_SCORE 0xFFFFFFF
-#define NEG_INF_SCORE -0xFFFFFFF
+#define INF_SCORE 0xFFFFFF
 
-#define MATE_SCORE 0xFFFFF
-#define NEG_MATE_SCORE -0xFFFFF
+#define MATE_SCORE 100000
 
 #define MAX_PLY 64 // doubt im ever even hitting this
 

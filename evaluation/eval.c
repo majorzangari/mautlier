@@ -176,7 +176,7 @@ int eg_table[2][6][64];
 int convert_to_traditional_index(int index) {
   int rank = index / 8;
   int file = index % 8;
-  return (7 - rank) * 8 + file;
+  return (7 - rank) * 8 + (7 - file);
 }
 
 void init_eval() {
@@ -297,7 +297,8 @@ static inline int evaluate_mobility(Board *board) {
 static inline int evaluate_king_safety(Board *pos, ToMove color) {
   int score = 0;
 
-  int king_index = lsb_index(pos->pieces[WHITE][KING]);
+  // use the king of the color being evaluated (was hardcoded to WHITE)
+  int king_index = lsb_index(pos->pieces[color][KING]);
 
   int file = king_index % 8;
 

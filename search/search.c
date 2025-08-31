@@ -144,12 +144,14 @@ static inline SearchResults search(Board *pos, int depth, int ply, int alpha,
   if (null_move && depth >= 3 &&
       !king_in_check(pos, color)) { // TODO: check endgame stuff?
     make_null_move(pos);
-    int score =
-        -search(pos, depth - 3, ply + 1, -beta, -beta + 1, info, false).score;
+    SearchResults child_res =
+        search(pos, depth - 3, ply + 1, -beta, -beta + 1, info, false);
     unmake_null_move(pos);
 
     if (info->stopped)
       return results;
+
+    int score = -child_res.score;
 
     if (score >= beta) {
       results.score = beta;
@@ -180,24 +182,30 @@ static inline SearchResults search(Board *pos, int depth, int ply, int alpha,
     int child_depth = depth - 1;
     int score;
 
-    if (i >= 16 && child_depth >= 3 && !is_capture(move) &&
+    if (i >= 12 && child_depth >= 3 && !is_capture(move) &&
         !is_promotion(move)) {
       int reduction = 1 + (child_depth / 6); // tune for strength
       child_depth -= reduction;
 
       SearchResults child_results =
           search(pos, child_depth, ply + 1, -alpha - 1, -alpha, info, true);
+      if (info->stopped)
+        return results;
       score = -child_results.score;
 
       if (score > alpha && score < beta) {
         child_results =
             search(pos, depth - 1, ply + 1, -beta, -alpha, info, true);
+        if (info->stopped)
+          return results;
         score = -child_results.score;
       }
 
     } else {
       SearchResults child_results =
           search(pos, child_depth, ply + 1, -beta, -alpha, info, true);
+      if (info->stopped)
+        return results;
       score = -child_results.score;
     }
 
@@ -206,6 +214,13 @@ static inline SearchResults search(Board *pos, int depth, int ply, int alpha,
     if (score > results.score) {
       results.score = score;
       results.best_move = move;
+    }
+
+    // TODO: make sure this is safe
+    if (results.score >= MATE_THRESHOLD) {
+      tt_store(hash, depth, results.score, orig_alpha, orig_beta, ply,
+               results.best_move);
+      return results;
     }
 
     if (results.score > alpha) {
