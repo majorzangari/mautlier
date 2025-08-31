@@ -166,7 +166,7 @@ static inline SearchResults search(Board *pos, int depth, int ply, int alpha,
   for (int i = 0; i < num_moves; i++) {
     int move_index =
         pick_next_move(moves, move_scores, num_moves, i, num_moves);
-    assert(move_index >= 0 && move_index < num_moves); // TODO: remove
+
     Move move = moves[move_index];
     board_make_move(pos, move);
 
@@ -177,9 +177,29 @@ static inline SearchResults search(Board *pos, int depth, int ply, int alpha,
 
     has_legal = 1;
 
-    SearchResults child_results =
-        search(pos, depth - 1, ply + 1, -beta, -alpha, info, null_move);
-    int score = -child_results.score;
+    int child_depth = depth - 1;
+    int score;
+
+    if (i >= 16 && child_depth >= 3 && !is_capture(move) &&
+        !is_promotion(move)) {
+      int reduction = 1 + (child_depth / 6); // tune for strength
+      child_depth -= reduction;
+
+      SearchResults child_results =
+          search(pos, child_depth, ply + 1, -alpha - 1, -alpha, info, true);
+      score = -child_results.score;
+
+      if (score > alpha && score < beta) {
+        child_results =
+            search(pos, depth - 1, ply + 1, -beta, -alpha, info, true);
+        score = -child_results.score;
+      }
+
+    } else {
+      SearchResults child_results =
+          search(pos, child_depth, ply + 1, -beta, -alpha, info, true);
+      score = -child_results.score;
+    }
 
     board_unmake_move(pos, move);
 
