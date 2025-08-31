@@ -566,3 +566,42 @@ Bitboard generate_attacks(Board *pos, Piece piece, int square, ToMove color) {
   }
   return 0ULL;
 }
+
+int generate_noisy_moves(Board *board, Move moves[MAX_MOVES]) {
+  DP_PRINTF("FUNC_TRACE", "generate_noisy_moves\n");
+  int move_count = 0;
+  if (board->game_state != GS_ONGOING) {
+    return 0;
+  }
+
+  Bitboard pawns = board->pieces[board->to_move][PAWN];
+  Bitboard knights = board->pieces[board->to_move][KNIGHT];
+  Bitboard bishops = board->pieces[board->to_move][BISHOP];
+  Bitboard rooks = board->pieces[board->to_move][ROOK];
+  Bitboard queens = board->pieces[board->to_move][QUEEN];
+  Bitboard kings = board->pieces[board->to_move][KING];
+  Bitboard same_side_occupied = board->occupied_by_color[board->to_move];
+  Bitboard enemy_side_occupied = board->occupied_by_color[1 - board->to_move];
+
+  move_count += generate_pawn_captures(pawns, enemy_side_occupied,
+                                       moves + move_count, board->to_move);
+  move_count += generate_en_passant(pawns, BOARD_CURR_STATE(board).en_passant,
+                                    board->to_move, moves + move_count);
+  move_count += generate_knight_moves(knights, same_side_occupied,
+                                      enemy_side_occupied, moves + move_count);
+  move_count +=
+      generate_rook_moves(rooks | queens, board->occupied, same_side_occupied,
+                          enemy_side_occupied, moves + move_count);
+  move_count += generate_bishop_moves(bishops | queens, board->occupied,
+                                      same_side_occupied, enemy_side_occupied,
+                                      moves + move_count);
+  move_count += generate_king_moves(kings, same_side_occupied,
+                                    enemy_side_occupied, moves + move_count);
+  for (int i = 0; i < move_count; i++) {
+    if (!is_capture(moves[i]) && !is_promotion(moves[i])) {
+      moves[i] = moves[--move_count];
+      i--;
+    }
+  }
+  return move_count;
+}

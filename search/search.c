@@ -32,8 +32,54 @@ static inline long get_time_ms() {
   return (t.tv_sec * 1000) + (t.tv_usec / 1000);
 }
 
+static inline int quiescence(int alpha, int beta, Board *pos) {
+  int static_eval = COLOR_MULTIPLIER(pos->to_move) * lazy_evaluation(pos);
+  int best_value = static_eval;
+
+  if (static_eval >= beta) {
+    return beta;
+  }
+  if (alpha < static_eval) {
+    alpha = static_eval;
+  }
+
+  ToMove color = pos->to_move;
+  Move moves[MAX_MOVES];
+  int num_moves = generate_noisy_moves(pos, moves);
+  int move_scores[MAX_MOVES];
+  score_moves(pos, moves, move_scores, num_moves, NULL_MOVE, 0);
+
+  for (int i = 0; i < num_moves; i++) {
+    int move_index =
+        pick_next_move(moves, move_scores, num_moves, i, num_moves);
+    Move move = moves[move_index];
+
+    board_make_move(pos, move);
+
+    if (king_in_check(pos, color)) {
+      board_unmake_move(pos, move);
+      continue;
+    }
+
+    int score = -quiescence(-beta, -alpha, pos);
+
+    board_unmake_move(pos, move);
+
+    if (score >= beta) {
+      return score;
+    }
+    if (score > best_value) {
+      best_value = score;
+    }
+    if (score > alpha) {
+      alpha = score;
+    }
+  }
+  return best_value;
+}
+
 static inline SearchResults search(Board *pos, int depth, int ply, int alpha,
-                                   int beta, SearchInfo *info) {
+                                   int beta, SearchInfo *info, bool null_move) {
 
   ToMove color = pos->to_move;
   SearchResults results = {.score = -INF_SCORE, .best_move = NULL_MOVE};
@@ -57,7 +103,7 @@ static inline SearchResults search(Board *pos, int depth, int ply, int alpha,
 
   // Check depth
   if (depth == 0 || pos->game_state != GS_ONGOING) {
-    results.score = COLOR_MULTIPLIER(color) * lazy_evaluation(pos);
+    results.score = quiescence(alpha, beta, pos);
     results.best_move = NULL_MOVE;
     return results;
   }
@@ -95,6 +141,22 @@ static inline SearchResults search(Board *pos, int depth, int ply, int alpha,
     }
   }
 
+  if (null_move && depth >= 3 &&
+      !king_in_check(pos, color)) { // TODO: check endgame stuff?
+    make_null_move(pos);
+    int score =
+        -search(pos, depth - 3, ply + 1, -beta, -beta + 1, info, false).score;
+    unmake_null_move(pos);
+
+    if (info->stopped)
+      return results;
+
+    if (score >= beta) {
+      results.score = beta;
+      return results; // fail-hard beta cutoff
+    }
+  }
+
   Move tt_move = (tt_entry != NULL) ? tt_entry->best_move : NULL_MOVE;
 
   int move_scores[MAX_MOVES];
@@ -116,7 +178,7 @@ static inline SearchResults search(Board *pos, int depth, int ply, int alpha,
     has_legal = 1;
 
     SearchResults child_results =
-        search(pos, depth - 1, ply + 1, -beta, -alpha, info);
+        search(pos, depth - 1, ply + 1, -beta, -alpha, info, null_move);
     int score = -child_results.score;
 
     board_unmake_move(pos, move);
@@ -188,7 +250,7 @@ void search_position(Board *board, SearchRequestInfo *info,
     if (search_info.stopped)
       break;
     SearchResults results =
-        search(board, depth, 0, -INF_SCORE, INF_SCORE, &search_info);
+        search(board, depth, 0, -INF_SCORE, INF_SCORE, &search_info, true);
 
     if (!search_info.stopped || best_move == NULL_MOVE) {
       best_move = results.best_move;

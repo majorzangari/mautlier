@@ -56,4 +56,6 @@ int is_promotion(Move move);
 
 Bitboard generate_attacks(Board *pos, Piece piece, int square, ToMove color);
 
+int generate_noisy_moves(Board *board, Move moves[MAX_MOVES]);
+
 #endif // MOVE_H

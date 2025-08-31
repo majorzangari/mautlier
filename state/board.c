@@ -556,3 +556,37 @@ void board_update_piece_table(Board *board) {
     }
   }
 }
+
+void make_null_move(Board *pos) {
+  if (pos->to_move == WHITE) {
+    pos->full_move_clock++;
+  }
+  GameStateDetails curr_state = BOARD_CURR_STATE(pos);
+  GameStateDetails new_state = {0};
+  new_state.halfmove_clock = curr_state.halfmove_clock + 1;
+  new_state.castling_rights = curr_state.castling_rights;
+  new_state.captured_piece = PIECE_NONE;
+  new_state.hash = toggle_turn(curr_state.hash);
+  if (curr_state.en_passant != 0) {
+    int old_ep = lsb_index(curr_state.en_passant);
+    new_state.hash = toggle_en_passant(new_state.hash, old_ep);
+  }
+  GameStateDetailsStack_push(&pos->game_state_stack, new_state);
+  pos->to_move = OPPOSITE_COLOR(pos->to_move);
+
+  if (is_special_draw(pos)) {
+    pos->game_state = GS_DRAW;
+  } else {
+    pos->game_state = GS_ONGOING; // technically could be won but saves time
+                                  // to not figure out yet
+  }
+}
+
+void unmake_null_move(Board *pos) {
+  if (pos->to_move == BLACK) {
+    pos->full_move_clock--;
+  }
+  GameStateDetailsStack_pop(&pos->game_state_stack);
+  pos->to_move = OPPOSITE_COLOR(pos->to_move);
+  pos->game_state = GS_ONGOING;
+}

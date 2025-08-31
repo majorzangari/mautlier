@@ -128,4 +128,7 @@ bool board_black_check(Board *board);
 // checks if board represents a valid state TODO: finish checking everything
 bool board_valid(Board *board);
 
+void make_null_move(Board *pos);
+void unmake_null_move(Board *pos);
+
 #endif // BOARD_H
