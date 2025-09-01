@@ -189,23 +189,17 @@ static inline SearchResults search(Board *pos, int depth, int ply, int alpha,
 
       SearchResults child_results =
           search(pos, child_depth, ply + 1, -alpha - 1, -alpha, info, true);
-      if (info->stopped)
-        return results;
       score = -child_results.score;
 
       if (score > alpha && score < beta) {
         child_results =
             search(pos, depth - 1, ply + 1, -beta, -alpha, info, true);
-        if (info->stopped)
-          return results;
         score = -child_results.score;
       }
 
     } else {
       SearchResults child_results =
           search(pos, child_depth, ply + 1, -beta, -alpha, info, true);
-      if (info->stopped)
-        return results;
       score = -child_results.score;
     }
 
