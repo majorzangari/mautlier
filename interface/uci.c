@@ -28,9 +28,24 @@ void close_book() {
   book = NULL;
 }
 
+static UCIOptions uci_options = {
+    .transposition_table = true,
+    .quiescence_search = true,
+    .book = true,
+    .null_move_pruning = true,
+    .move_ordering = true,
+    .lmr = true,
+};
+
 void uci() {
   printf("id name %s %s\n", ID_NAME, ID_VERSION);
   printf("id author %s\n", ID_AUTHOR);
+  printf("option name TranspositionTable type check default true\n");
+  printf("option name QuiescenceSearch type check default true\n");
+  printf("option name Book type check default true\n");
+  printf("option name NullMovePruning type check default true\n");
+  printf("option name MoveOrdering type check default true\n");
+  printf("option name LMR type check default true\n");
   printf("uciok\n");
   fflush(stdout);
 }
@@ -118,7 +133,90 @@ void go(char *command, char *saveptr, Board *state) {
     info.max_duration_ms = 5000; // default to 5 seconds
   }
 
-  search_position(state, &info, book);
+  search_position(state, &info, &uci_options, book);
+}
+
+void setoption(char *command, char *saveptr) {
+  char *token = strtok_r(NULL, WHITESPACE, &saveptr);
+  if (token == NULL || strcmp(token, "name") != 0) {
+    return;
+  }
+
+  // TODO: yucky yucky logic
+  token = strtok_r(NULL, WHITESPACE, &saveptr);
+  if (strcmp(token, "TranspositionTable") == 0) {
+    token = strtok_r(NULL, WHITESPACE, &saveptr);
+    if (token != NULL && strcmp(token, "value") == 0) {
+      token = strtok_r(NULL, WHITESPACE, &saveptr);
+      if (token != NULL) {
+        if (strcmp(token, "true") == 0) {
+          uci_options.transposition_table = true;
+        } else if (strcmp(token, "false") == 0) {
+          uci_options.transposition_table = false;
+        }
+      }
+    }
+  } else if (strcmp(token, "QuiescenceSearch") == 0) {
+    token = strtok_r(NULL, WHITESPACE, &saveptr);
+    if (token != NULL && strcmp(token, "value") == 0) {
+      token = strtok_r(NULL, WHITESPACE, &saveptr);
+      if (token != NULL) {
+        if (strcmp(token, "true") == 0) {
+          uci_options.quiescence_search = true;
+        } else if (strcmp(token, "false") == 0) {
+          uci_options.quiescence_search = false;
+        }
+      }
+    }
+  } else if (strcmp(token, "Book") == 0) {
+    token = strtok_r(NULL, WHITESPACE, &saveptr);
+    if (token != NULL && strcmp(token, "value") == 0) {
+      token = strtok_r(NULL, WHITESPACE, &saveptr);
+      if (token != NULL) {
+        if (strcmp(token, "true") == 0) {
+          uci_options.book = true;
+        } else if (strcmp(token, "false") == 0) {
+          uci_options.book = false;
+        }
+      }
+    }
+  } else if (strcmp(token, "NullMovePruning") == 0) {
+    token = strtok_r(NULL, WHITESPACE, &saveptr);
+    if (token != NULL && strcmp(token, "value") == 0) {
+      token = strtok_r(NULL, WHITESPACE, &saveptr);
+      if (token != NULL) {
+        if (strcmp(token, "true") == 0) {
+          uci_options.null_move_pruning = true;
+        } else if (strcmp(token, "false") == 0) {
+          uci_options.null_move_pruning = false;
+        }
+      }
+    }
+  } else if (strcmp(token, "MoveOrdering") == 0) {
+    token = strtok_r(NULL, WHITESPACE, &saveptr);
+    if (token != NULL && strcmp(token, "value") == 0) {
+      token = strtok_r(NULL, WHITESPACE, &saveptr);
+      if (token != NULL) {
+        if (strcmp(token, "true") == 0) {
+          uci_options.move_ordering = true;
+        } else if (strcmp(token, "false") == 0) {
+          uci_options.move_ordering = false;
+        }
+      }
+    }
+  } else if (strcmp(token, "LMR") == 0) {
+    token = strtok_r(NULL, WHITESPACE, &saveptr);
+    if (token != NULL && strcmp(token, "value") == 0) {
+      token = strtok_r(NULL, WHITESPACE, &saveptr);
+      if (token != NULL) {
+        if (strcmp(token, "true") == 0) {
+          uci_options.lmr = true;
+        } else if (strcmp(token, "false") == 0) {
+          uci_options.lmr = false;
+        }
+      }
+    }
+  }
 }
 
 int uci_main() {
@@ -191,11 +289,15 @@ int uci_main() {
 
     else if (strcmp(command, "d") == 0) {
       if (state == NULL) {
-        printf(
-            "No board initialized. Use 'ucinewgame' or 'position' command.\n");
+        printf("No board initialized. Use 'ucinewgame' or 'position' "
+               "command.\n");
       } else {
         printf("%s\n", board_to_debug_string(state));
       }
+    }
+
+    else if (strcmp(command, "setoption") == 0) {
+      setoption(command, saveptr);
     }
 
     else if (strcmp(command, "quit") == 0) {

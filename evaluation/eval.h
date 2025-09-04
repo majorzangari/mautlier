@@ -19,4 +19,6 @@ void init_eval();
 
 int lazy_evaluation(Board *board);
 
+bool is_endgame(Board *board);
+
 #endif

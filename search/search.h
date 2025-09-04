@@ -2,6 +2,7 @@
 #define MAUTLIER_SEARCH_H
 
 #include "move.h"
+#include "uci.h"
 
 // inf might be a misnomer, just a big number to trump other factors
 #define INF_SCORE 0xFFFFFF
@@ -17,6 +18,7 @@ typedef struct {
   int infinite;
 } SearchRequestInfo;
 
-void search_position(Board *board, SearchRequestInfo *info, FILE *book);
+void search_position(Board *board, SearchRequestInfo *info, UCIOptions *options,
+                     FILE *book);
 
 #endif

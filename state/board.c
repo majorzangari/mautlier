@@ -396,7 +396,6 @@ void board_make_move(Board *board, Move move) {
     new_state.halfmove_clock = 0;
     int ep_shift =
         (board->to_move == WHITE) ? (to_square - 8) : (to_square + 8);
-    // TODO: check if ep is legal
     int ep_file = ep_shift % 8;
     if (board->to_move == WHITE) {
       if ((ep_file > 0 &&
@@ -422,7 +421,7 @@ void board_make_move(Board *board, Move move) {
   case FLAGS_LONG_CASTLE:
     long_castle(board, &new_state);
     break;
-  case FLAGS_EN_PASSANT: // why is this a case? TODO: figure out
+  case FLAGS_EN_PASSANT:
     move_piece(board, &new_state, from_square, to_square, FLAGS_NONE);
     int ep_capture_shift =
         (board->to_move == WHITE) ? (to_square - 8) : (to_square + 8);

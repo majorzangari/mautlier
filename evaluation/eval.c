@@ -3,6 +3,7 @@
 #include "board.h"
 #include "misc.h"
 #include "search.h"
+#include <math.h>
 
 /* Bulk of eval from Pesto, see:
 https://www.chessprogramming.org/PeSTO%27s_Evaluation_Function
@@ -168,8 +169,8 @@ int* eg_pesto_table[6] = {
 int gamephaseInc[6] = {0, 1, 1, 2, 4, 0};
 int mg_table[2][6][64];
 int eg_table[2][6][64];
-// clang-format on
 
+// clang-format on
 #define FLIP(sq) (sq ^ 56)
 
 // converts my weird index into one that works with the tables above
@@ -199,10 +200,34 @@ void init_eval() {
   }
 }
 
+typedef struct {
+  int mg;
+  int eg;
+} Eval;
+
+#define ADD_EVAL(eval1, eval2)                                                 \
+  do {                                                                         \
+    (eval1).mg += (eval2).mg;                                                  \
+    (eval1).eg += (eval2).eg;                                                  \
+  } while (0)
+
+#define SUBTRACT_EVAL(eval1, eval2)                                            \
+  do {                                                                         \
+    (eval1).mg -= (eval2).mg;                                                  \
+    (eval1).eg -= (eval2).eg;                                                  \
+  } while (0)
+
 // TODO:tune
-#define ISOLATED_PAWN_PENALTY 20
-#define DOUBLED_PAWN_PENALTY 20
-#define PASSED_PAWN_BONUS 35
+#define ISOLATED_PAWN_PENALTY_MG 20
+#define ISOLATED_PAWN_PENALTY_EG 10
+#define DOUBLED_PAWN_PENALTY_MG 15
+#define DOUBLED_PAWN_PENALTY_EG 8
+#define PASSED_PAWN_BONUS_MG 15
+#define PASSED_PAWN_BONUS_EG 25
+#define BACKWARD_PAWN_PENALTY_MG 18
+#define BACKWARD_PAWN_PENALTY_EG 10
+
+#define CONNECTED_PAWN_BONUS 10
 
 static inline Bitboard adjacent_files(int file) {
   Bitboard mask = 0;
@@ -225,6 +250,14 @@ static inline Bitboard same_file_ahead(int file, int index, ToMove color) {
   return mask & ~(1ULL << index); // TODO: last operation might not be necessary
 }
 
+static Bitboard behind_mask(int sq, ToMove color) {
+  if (color == WHITE) {
+    return (1ULL << sq) - 1; // all bits before sq
+  } else {
+    return ~((1ULL << (sq + 1)) - 1); // all bits after sq
+  }
+}
+
 static inline Bitboard blocking_pawns_mask(int file, int index, ToMove color) {
   Bitboard front = same_file_ahead(file, index, color);
   Bitboard right = (file > 0) ? same_file_ahead(file - 1, index, color) : 0;
@@ -232,44 +265,53 @@ static inline Bitboard blocking_pawns_mask(int file, int index, ToMove color) {
   return front | right | left;
 }
 
-static inline int evaluate_pawn_structure(Board *board, ToMove color) {
-  int score = 0;
-  Bitboard pawns = board->pieces[color][PAWN];
+static inline Eval evaluate_pawn_structure(Board *board) {
+  Eval score = {0};
 
-  while (pawns) {
-    int sq = lsb_index(pawns);
-    pop_lsb(pawns);
+  for (int color = WHITE; color <= BLACK; color++) {
+    Bitboard pawns = board->pieces[color][PAWN];
 
-    int file = sq % 8;
-    int rank = sq / 8;
+    while (pawns) {
+      int sq = lsb_index(pawns);
+      pop_lsb(pawns);
 
-    if (!(board->pieces[color][PAWN] & adjacent_files(file))) {
-      // Isolated pawn
-      score -= ISOLATED_PAWN_PENALTY;
+      int file = sq % 8;
+      int rank = sq / 8;
+
+      if (!(board->pieces[color][PAWN] & adjacent_files(file))) {
+        // Isolated pawn
+        score.mg -= COLOR_MULTIPLIER(color) * ISOLATED_PAWN_PENALTY_MG;
+        score.eg -= COLOR_MULTIPLIER(color) * ISOLATED_PAWN_PENALTY_EG;
+      }
+
+      if (board->pieces[color][PAWN] & same_file_ahead(file, sq, color)) {
+        // Doubled pawn
+        score.mg -= COLOR_MULTIPLIER(color) * DOUBLED_PAWN_PENALTY_MG;
+        score.eg -= COLOR_MULTIPLIER(color) * DOUBLED_PAWN_PENALTY_EG;
+      }
+
+      if (!(board->pieces[OPPOSITE_COLOR(color)][PAWN] &
+            blocking_pawns_mask(file, sq, color))) {
+        // Passed pawn
+        score.mg +=
+            COLOR_MULTIPLIER(color) *
+            (PASSED_PAWN_BONUS_MG + (color == WHITE ? rank : (7 - rank)) * 10);
+
+        score.eg +=
+            COLOR_MULTIPLIER(color) *
+            (PASSED_PAWN_BONUS_EG + (color == WHITE ? rank : (7 - rank)) * 10);
+      }
     }
-
-    if (board->pieces[color][PAWN] & same_file_ahead(file, sq, color)) {
-      // Doubled pawn
-      score -= DOUBLED_PAWN_PENALTY;
-    }
-
-    // TODO: passed
-    if (!(board->pieces[OPPOSITE_COLOR(color)][PAWN] &
-          blocking_pawns_mask(file, sq, color))) {
-      // Passed pawn
-      score += PASSED_PAWN_BONUS + (color == WHITE ? rank : (7 - rank)) * 10;
-    }
-    // TODO: backward
-    // TODO: connected
   }
 
   return score;
 }
 
-static inline int evaluate_mobility(Board *board) {
-  int score = 0;
+static inline Eval evaluate_mobility(Board *board) {
+  Eval score = {0};
 
-  const int mobility_value[6] = {0, 4, 3, 2, 1, 0};
+  const int mobility_mg[6] = {0, 4, 3, 2, 4, 0};
+  const int mobility_eg[6] = {0, 1, 2, 3, 2, 0};
 
   for (ToMove color = WHITE; color <= BLACK; color++) {
     for (Piece piece = KNIGHT; piece <= QUEEN; piece++) {
@@ -277,12 +319,19 @@ static inline int evaluate_mobility(Board *board) {
       while (bitboard) {
         int sq = lsb_index(bitboard);
         pop_lsb(bitboard);
+
         Bitboard attacks = generate_attacks(board, piece, sq, color);
         int mobility = count_set_bits(attacks);
+
+        int mgMob = mobility * mobility_mg[piece];
+        int egMob = mobility * mobility_eg[piece];
+
         if (color == WHITE) {
-          score += mobility * mobility_value[piece];
+          score.mg += mgMob;
+          score.eg += egMob;
         } else {
-          score -= mobility * mobility_value[piece];
+          score.mg -= mgMob;
+          score.eg -= egMob;
         }
       }
     }
@@ -291,38 +340,132 @@ static inline int evaluate_mobility(Board *board) {
   return score;
 }
 
+static inline int distance_from_center(int index) { // TODO: dumb?
+  int rank = index / 8;
+  int file = index % 8;
+  float center_rank = 3.5f;
+  float center_file = 3.5f;
+  return (int)(fabs(rank - center_rank) + fabs(file - center_file));
+}
+
 #define FRONT_PAWN_BONUS 20
 #define FRONT_SIDE_PAWN_BONUS 10
 
-static inline int evaluate_king_safety(Board *pos, ToMove color) {
-  int score = 0;
+#define CASTLE_BONUS_MG 20
+#define CASTLE_BONUS_EG 6
 
-  // use the king of the color being evaluated (was hardcoded to WHITE)
-  int king_index = lsb_index(pos->pieces[color][KING]);
+#define SEMI_OPEN_PENALTY_MG 12
+#define SEMI_OPEN_PENALTY_EG 4
+#define OPEN_PENALTY_MG 20
+#define OPEN_PENALTY_EG 8
 
-  int file = king_index % 8;
+static inline Eval evaluate_king(const Board *board, int color) {
+  Eval out = {0, 0};
+  int king_index = lsb_index(board->pieces[color][KING]); // assume only 1 king
 
-  // checks pawn in front of king + castled
-  if (file < 3 || file > 4) {
-    // castled
-    int front_pawn = king_index + (color == WHITE ? 8 : -8);
-    int front_right_pawn = front_pawn + 1;
-    int front_left_pawn = front_pawn - 1;
-    if (pos->pieces[color][PAWN] & (1ULL << front_pawn)) {
-      score += FRONT_PAWN_BONUS;
-    }
-    if (pos->pieces[color][PAWN] & (1ULL << front_right_pawn)) {
-      score += FRONT_SIDE_PAWN_BONUS;
-    }
-    if (pos->pieces[color][PAWN] & (1ULL << front_left_pawn)) {
-      score += FRONT_SIDE_PAWN_BONUS;
-    }
-  } else {
-    // uncastled
-    score -= 20;
+  int king_file = king_index % 8;
+  int king_rank = king_index / 8;
+
+  // castling
+  if ((color == WHITE && king_rank == 0 &&
+       (king_file == 6 || king_file == 2)) ||
+      (color == BLACK && king_rank == 7 &&
+       (king_file == 6 || king_file == 2))) {
+    out.mg += CASTLE_BONUS_MG;
+    out.eg += CASTLE_BONUS_EG;
   }
 
-  // TODO: add more king safety checks
+  // center king
+  if (!(king_rank == 0 || king_rank == 7)) {
+    out.mg -= 25;
+  }
+
+  // pawn shield
+  int front_pawn = king_index + (color == WHITE ? 8 : -8);
+  int front_right_pawn = front_pawn + 1;
+  int front_left_pawn = front_pawn - 1;
+  if (board->pieces[color][PAWN] & (1ULL << front_pawn)) {
+    out.mg += FRONT_PAWN_BONUS;
+  }
+  if (board->pieces[color][PAWN] & (1ULL << front_right_pawn)) {
+    out.mg += FRONT_SIDE_PAWN_BONUS;
+  }
+  if (board->pieces[color][PAWN] & (1ULL << front_left_pawn)) {
+    out.mg += FRONT_SIDE_PAWN_BONUS;
+  }
+
+  // open file penalty
+  for (int df = -1; df <= 1; df++) {
+    int f = king_file + df;
+    if (f < 0 || f > 7)
+      continue;
+
+    bool friendlyPawn = false, enemyPawn = false;
+    for (int r = 0; r < 8; r++) {
+      int sq = r * 8 + f;
+      if (board->pieces[color][PAWN] & (1ULL << sq))
+        friendlyPawn = true;
+      if (board->pieces[!color][PAWN] & (1ULL << sq))
+        enemyPawn = true;
+    }
+
+    if (!friendlyPawn && enemyPawn) { // semi-open
+      out.mg -= SEMI_OPEN_PENALTY_MG;
+      out.eg -= SEMI_OPEN_PENALTY_EG;
+    } else if (!friendlyPawn && !enemyPawn) { // open
+      out.mg -= OPEN_PENALTY_MG;
+      out.eg -= OPEN_PENALTY_EG;
+    }
+  }
+
+  // encourage king in the center in EG
+  int centerDistance = distance_from_center(king_index); // e4/d4/e5/d5 = 0
+  out.eg -= centerDistance * 3; // up to -12 if far corner
+
+  return out;
+}
+
+#define BISHOP_MG_PAIR_BONUS 30
+#define BISHOP_EG_PAIR_BONUS 40
+
+#define SEMI_OPEN_ROOK_MG 12
+#define SEMI_OPEN_ROOK_EG 8
+#define OPEN_ROOK_MG 24
+#define OPEN_ROOK_EG 18
+
+static inline Eval misc_eval(Board *board) {
+  Eval score = {0};
+  if (count_set_bits(board->pieces[WHITE][BISHOP]) >= 2) {
+    score.mg += BISHOP_MG_PAIR_BONUS;
+    score.eg += BISHOP_EG_PAIR_BONUS;
+  }
+  if (count_set_bits(board->pieces[BLACK][BISHOP]) >= 2) {
+    score.mg -= BISHOP_MG_PAIR_BONUS;
+    score.eg -= BISHOP_EG_PAIR_BONUS;
+  }
+
+  for (int color = WHITE; color <= BLACK; color++) {
+    Bitboard rooks = board->pieces[color][ROOK];
+    while (rooks) {
+      int rook_index = lsb_index(rooks);
+
+      Bitboard file_mask = FILE_H << (rook_index % 8);
+
+      if (!(file_mask & board->pieces[color][PAWN])) {
+        // semi-open
+        if (!(file_mask & board->pieces[OPPOSITE_COLOR(color)][PAWN])) {
+          // open
+          score.mg += COLOR_MULTIPLIER(color) * OPEN_ROOK_MG;
+          score.eg += COLOR_MULTIPLIER(color) * OPEN_ROOK_EG;
+        } else {
+          score.mg += COLOR_MULTIPLIER(color) * SEMI_OPEN_ROOK_MG;
+          score.eg += COLOR_MULTIPLIER(color) * SEMI_OPEN_ROOK_EG;
+        }
+      }
+
+      pop_lsb(rooks);
+    }
+  }
 
   return score;
 }
@@ -364,21 +507,43 @@ int lazy_evaluation(Board *board) {
     }
   }
 
-  int mg_score = mg[WHITE] - mg[BLACK];
-  int eg_score = eg[WHITE] - eg[BLACK];
+  Eval score = {0};
+  score.mg = mg[WHITE] - mg[BLACK];
+  score.eg = eg[WHITE] - eg[BLACK];
+
   int mgPhase = game_phase;
   if (mgPhase > 24) {
     mgPhase = 24;
   }
   int egPhase = 24 - mgPhase;
 
-  int pesto_score = (mg_score * mgPhase + eg_score * egPhase) / 24;
-  int pawn_structure_score = evaluate_pawn_structure(board, WHITE) -
-                             evaluate_pawn_structure(board, BLACK);
-  int mobility_score = evaluate_mobility(board);
-  int king_safety_score =
-      evaluate_king_safety(board, WHITE) - evaluate_king_safety(board, BLACK);
+  Eval pawn_structure = evaluate_pawn_structure(board);
+  ADD_EVAL(score, pawn_structure);
+
+  Eval mobility = evaluate_mobility(board);
+  ADD_EVAL(score, mobility);
+
+  Eval white_king = evaluate_king(board, WHITE);
+  Eval black_king = evaluate_king(board, BLACK);
+  ADD_EVAL(score, white_king);
+  SUBTRACT_EVAL(score, black_king);
+
   int tempo_score = (board->to_move == WHITE) ? 10 : -10;
-  return pesto_score + pawn_structure_score + mobility_score +
-         king_safety_score + tempo_score;
+  Eval misc = misc_eval(board);
+  ADD_EVAL(score, misc);
+
+  int tapered_score = (score.mg * mgPhase + score.eg * egPhase) / 24;
+
+  return tapered_score + tempo_score;
+}
+
+bool is_endgame(Board *board) {
+  int queens = count_set_bits(board->pieces[WHITE][QUEEN]) +
+               count_set_bits(board->pieces[BLACK][QUEEN]);
+  int minor_major = 0;
+  for (Piece piece = KNIGHT; piece <= ROOK; piece++) {
+    minor_major += count_set_bits(board->pieces[WHITE][piece]);
+    minor_major += count_set_bits(board->pieces[BLACK][piece]);
+  }
+  return (queens == 0) || (queens == 1 && minor_major <= 1);
 }

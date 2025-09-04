@@ -79,7 +79,8 @@ static inline int quiescence(int alpha, int beta, Board *pos) {
 }
 
 static inline SearchResults search(Board *pos, int depth, int ply, int alpha,
-                                   int beta, SearchInfo *info, bool null_move) {
+                                   int beta, SearchInfo *info, bool null_move,
+                                   UCIOptions *options) {
 
   ToMove color = pos->to_move;
   SearchResults results = {.score = -INF_SCORE, .best_move = NULL_MOVE};
@@ -103,7 +104,11 @@ static inline SearchResults search(Board *pos, int depth, int ply, int alpha,
 
   // Check depth
   if (depth == 0 || pos->game_state != GS_ONGOING) {
-    results.score = quiescence(alpha, beta, pos);
+    if (options->quiescence_search) {
+      results.score = quiescence(alpha, beta, pos);
+    } else {
+      results.score = COLOR_MULTIPLIER(pos->to_move) * lazy_evaluation(pos);
+    }
     results.best_move = NULL_MOVE;
     return results;
   }
@@ -112,7 +117,8 @@ static inline SearchResults search(Board *pos, int depth, int ply, int alpha,
   int num_moves = generate_moves(pos, moves);
 
   // Check TT
-  if (tt_entry != NULL && tt_entry->depth >= depth) {
+  if (options->transposition_table && tt_entry != NULL &&
+      tt_entry->depth >= depth) {
     bool found_move = false;
     for (int i = 0; i < num_moves; i++) {
       if (moves[i] == tt_entry->best_move) {
@@ -141,11 +147,11 @@ static inline SearchResults search(Board *pos, int depth, int ply, int alpha,
     }
   }
 
-  if (null_move && depth >= 3 &&
-      !king_in_check(pos, color)) { // TODO: check endgame stuff?
+  if (options->null_move_pruning && null_move && depth >= 3 &&
+      !king_in_check(pos, color) && !is_endgame(pos)) {
     make_null_move(pos);
     SearchResults child_res =
-        search(pos, depth - 3, ply + 1, -beta, -beta + 1, info, false);
+        search(pos, depth - 3, ply + 1, -beta, -beta + 1, info, false, options);
     unmake_null_move(pos);
 
     if (info->stopped)
@@ -182,24 +188,24 @@ static inline SearchResults search(Board *pos, int depth, int ply, int alpha,
     int child_depth = depth - 1;
     int score;
 
-    if (i >= 12 && child_depth >= 3 && !is_capture(move) &&
+    if (options->lmr && i >= 12 && child_depth >= 3 && !is_capture(move) &&
         !is_promotion(move)) {
       int reduction = 1 + (child_depth / 6); // tune for strength
       child_depth -= reduction;
 
-      SearchResults child_results =
-          search(pos, child_depth, ply + 1, -alpha - 1, -alpha, info, true);
+      SearchResults child_results = search(
+          pos, child_depth, ply + 1, -alpha - 1, -alpha, info, true, options);
       score = -child_results.score;
 
       if (score > alpha && score < beta) {
         child_results =
-            search(pos, depth - 1, ply + 1, -beta, -alpha, info, true);
+            search(pos, depth - 1, ply + 1, -beta, -alpha, info, true, options);
         score = -child_results.score;
       }
 
     } else {
       SearchResults child_results =
-          search(pos, child_depth, ply + 1, -beta, -alpha, info, true);
+          search(pos, child_depth, ply + 1, -beta, -alpha, info, true, options);
       score = -child_results.score;
     }
 
@@ -237,7 +243,7 @@ static inline SearchResults search(Board *pos, int depth, int ply, int alpha,
   return results;
 }
 
-void search_position(Board *board, SearchRequestInfo *info,
+void search_position(Board *board, SearchRequestInfo *info, UCIOptions *options,
                      FILE *opening_book) {
   long end_time_ms = get_time_ms() + info->max_duration_ms;
   SearchInfo search_info = {
@@ -250,7 +256,7 @@ void search_position(Board *board, SearchRequestInfo *info,
 
   uint64_t hash = ZOBRIST_HASH(board);
 
-  if (opening_book != NULL && board->full_move_clock < 20) {
+  if (options->book && opening_book != NULL && board->full_move_clock < 20) {
     printf("info string looking for book move\n");
     fflush(stdout);
     Move move = lookup_book_move(hash, opening_book, board);
@@ -271,8 +277,8 @@ void search_position(Board *board, SearchRequestInfo *info,
   for (int depth = 1; depth <= MAX_PLY; depth++) {
     if (search_info.stopped)
       break;
-    SearchResults results =
-        search(board, depth, 0, -INF_SCORE, INF_SCORE, &search_info, true);
+    SearchResults results = search(board, depth, 0, -INF_SCORE, INF_SCORE,
+                                   &search_info, true, options);
 
     if (!search_info.stopped || best_move == NULL_MOVE) {
       best_move = results.best_move;
