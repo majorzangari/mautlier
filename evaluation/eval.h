@@ -2,6 +2,7 @@
 #define MAUTLIER_EVAL_H
 
 #include "board.h"
+#include "tuning.h"
 
 #define EVAL_PAWN 100
 #define EVAL_KNIGHT 320
@@ -17,8 +18,12 @@ static const int piece_values[7] = {
 
 void init_eval();
 
-int lazy_evaluation(Board *board);
+int evaluation(const Board *board, double weights[NUM_FEATURES]);
 
 bool is_endgame(Board *board);
+
+Features extract_features(const Board *board);
+
+int fixed_evaluation(const Board *board);
 
 #endif

@@ -30,6 +30,9 @@ add_executable(mautlier
     benchmark/benchmark.c
 
     test/perft.c
+
+    tuning/tuning.c
+    tuning/data_parse.c
 )
 
 target_include_directories(mautlier PRIVATE
@@ -41,7 +44,13 @@ target_include_directories(mautlier PRIVATE
     ${CMAKE_SOURCE_DIR}/interface
     ${CMAKE_SOURCE_DIR}/test
     ${CMAKE_SOURCE_DIR}/benchmark
+    ${CMAKE_SOURCE_DIR}/tuning
 )
+
+find_library(MATH_LIBRARY m)
+if(MATH_LIBRARY)
+    target_link_libraries(mautlier PRIVATE ${MATH_LIBRARY})
+endif()
 
 if (CMAKE_BUILD_TYPE STREQUAL "Debug")
     target_compile_definitions(mautlier PRIVATE MAUTLIER_DEBUG)

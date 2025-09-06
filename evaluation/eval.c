@@ -265,81 +265,6 @@ static inline Bitboard blocking_pawns_mask(int file, int index, ToMove color) {
   return front | right | left;
 }
 
-static inline Eval evaluate_pawn_structure(Board *board) {
-  Eval score = {0};
-
-  for (int color = WHITE; color <= BLACK; color++) {
-    Bitboard pawns = board->pieces[color][PAWN];
-
-    while (pawns) {
-      int sq = lsb_index(pawns);
-      pop_lsb(pawns);
-
-      int file = sq % 8;
-      int rank = sq / 8;
-
-      if (!(board->pieces[color][PAWN] & adjacent_files(file))) {
-        // Isolated pawn
-        score.mg -= COLOR_MULTIPLIER(color) * ISOLATED_PAWN_PENALTY_MG;
-        score.eg -= COLOR_MULTIPLIER(color) * ISOLATED_PAWN_PENALTY_EG;
-      }
-
-      if (board->pieces[color][PAWN] & same_file_ahead(file, sq, color)) {
-        // Doubled pawn
-        score.mg -= COLOR_MULTIPLIER(color) * DOUBLED_PAWN_PENALTY_MG;
-        score.eg -= COLOR_MULTIPLIER(color) * DOUBLED_PAWN_PENALTY_EG;
-      }
-
-      if (!(board->pieces[OPPOSITE_COLOR(color)][PAWN] &
-            blocking_pawns_mask(file, sq, color))) {
-        // Passed pawn
-        score.mg +=
-            COLOR_MULTIPLIER(color) *
-            (PASSED_PAWN_BONUS_MG + (color == WHITE ? rank : (7 - rank)) * 10);
-
-        score.eg +=
-            COLOR_MULTIPLIER(color) *
-            (PASSED_PAWN_BONUS_EG + (color == WHITE ? rank : (7 - rank)) * 10);
-      }
-    }
-  }
-
-  return score;
-}
-
-static inline Eval evaluate_mobility(Board *board) {
-  Eval score = {0};
-
-  const int mobility_mg[6] = {0, 4, 3, 2, 4, 0};
-  const int mobility_eg[6] = {0, 1, 2, 3, 2, 0};
-
-  for (ToMove color = WHITE; color <= BLACK; color++) {
-    for (Piece piece = KNIGHT; piece <= QUEEN; piece++) {
-      Bitboard bitboard = board->pieces[color][piece];
-      while (bitboard) {
-        int sq = lsb_index(bitboard);
-        pop_lsb(bitboard);
-
-        Bitboard attacks = generate_attacks(board, piece, sq, color);
-        int mobility = count_set_bits(attacks);
-
-        int mgMob = mobility * mobility_mg[piece];
-        int egMob = mobility * mobility_eg[piece];
-
-        if (color == WHITE) {
-          score.mg += mgMob;
-          score.eg += egMob;
-        } else {
-          score.mg -= mgMob;
-          score.eg -= egMob;
-        }
-      }
-    }
-  }
-
-  return score;
-}
-
 static inline int distance_from_center(int index) { // TODO: dumb?
   int rank = index / 8;
   int file = index % 8;
@@ -359,72 +284,6 @@ static inline int distance_from_center(int index) { // TODO: dumb?
 #define OPEN_PENALTY_MG 20
 #define OPEN_PENALTY_EG 8
 
-static inline Eval evaluate_king(const Board *board, int color) {
-  Eval out = {0, 0};
-  int king_index = lsb_index(board->pieces[color][KING]); // assume only 1 king
-
-  int king_file = king_index % 8;
-  int king_rank = king_index / 8;
-
-  // castling
-  if ((color == WHITE && king_rank == 0 &&
-       (king_file == 6 || king_file == 2)) ||
-      (color == BLACK && king_rank == 7 &&
-       (king_file == 6 || king_file == 2))) {
-    out.mg += CASTLE_BONUS_MG;
-    out.eg += CASTLE_BONUS_EG;
-  }
-
-  // center king
-  if (!(king_rank == 0 || king_rank == 7)) {
-    out.mg -= 25;
-  }
-
-  // pawn shield
-  int front_pawn = king_index + (color == WHITE ? 8 : -8);
-  int front_right_pawn = front_pawn + 1;
-  int front_left_pawn = front_pawn - 1;
-  if (board->pieces[color][PAWN] & (1ULL << front_pawn)) {
-    out.mg += FRONT_PAWN_BONUS;
-  }
-  if (board->pieces[color][PAWN] & (1ULL << front_right_pawn)) {
-    out.mg += FRONT_SIDE_PAWN_BONUS;
-  }
-  if (board->pieces[color][PAWN] & (1ULL << front_left_pawn)) {
-    out.mg += FRONT_SIDE_PAWN_BONUS;
-  }
-
-  // open file penalty
-  for (int df = -1; df <= 1; df++) {
-    int f = king_file + df;
-    if (f < 0 || f > 7)
-      continue;
-
-    bool friendlyPawn = false, enemyPawn = false;
-    for (int r = 0; r < 8; r++) {
-      int sq = r * 8 + f;
-      if (board->pieces[color][PAWN] & (1ULL << sq))
-        friendlyPawn = true;
-      if (board->pieces[!color][PAWN] & (1ULL << sq))
-        enemyPawn = true;
-    }
-
-    if (!friendlyPawn && enemyPawn) { // semi-open
-      out.mg -= SEMI_OPEN_PENALTY_MG;
-      out.eg -= SEMI_OPEN_PENALTY_EG;
-    } else if (!friendlyPawn && !enemyPawn) { // open
-      out.mg -= OPEN_PENALTY_MG;
-      out.eg -= OPEN_PENALTY_EG;
-    }
-  }
-
-  // encourage king in the center in EG
-  int centerDistance = distance_from_center(king_index); // e4/d4/e5/d5 = 0
-  out.eg -= centerDistance * 3; // up to -12 if far corner
-
-  return out;
-}
-
 #define BISHOP_MG_PAIR_BONUS 30
 #define BISHOP_EG_PAIR_BONUS 40
 
@@ -433,17 +292,114 @@ static inline Eval evaluate_king(const Board *board, int color) {
 #define OPEN_ROOK_MG 24
 #define OPEN_ROOK_EG 18
 
-static inline Eval misc_eval(Board *board) {
-  Eval score = {0};
-  if (count_set_bits(board->pieces[WHITE][BISHOP]) >= 2) {
-    score.mg += BISHOP_MG_PAIR_BONUS;
-    score.eg += BISHOP_EG_PAIR_BONUS;
+bool is_endgame(Board *board) {
+  int queens = count_set_bits(board->pieces[WHITE][QUEEN]) +
+               count_set_bits(board->pieces[BLACK][QUEEN]);
+  int minor_major = 0;
+  for (Piece piece = KNIGHT; piece <= ROOK; piece++) {
+    minor_major += count_set_bits(board->pieces[WHITE][piece]);
+    minor_major += count_set_bits(board->pieces[BLACK][piece]);
   }
-  if (count_set_bits(board->pieces[BLACK][BISHOP]) >= 2) {
-    score.mg -= BISHOP_MG_PAIR_BONUS;
-    score.eg -= BISHOP_EG_PAIR_BONUS;
+  return (queens == 0) || (queens == 1 && minor_major <= 1);
+}
+
+static inline bool is_castled(const Board *board, int color) {
+  int king_sq = lsb_index(board->pieces[color][KING]); // assume only 1 king
+  int rank = king_sq / 8;
+  int file = king_sq % 8;
+
+  if (color == WHITE && rank == 0) {
+    return (file == 6 || file == 2);
+  }
+  if (color == BLACK && rank == 7) {
+    return (file == 6 || file == 2);
+  }
+  return false;
+}
+
+static inline bool king_front_pawn(const Board *board, int color) {
+  int king_sq = lsb_index(board->pieces[color][KING]); // assume only 1 king
+  int front_pawn_sq = king_sq + (color == WHITE ? 8 : -8);
+  return board->pieces[color][PAWN] & (1ULL << front_pawn_sq);
+}
+
+static inline int king_side_pawn(const Board *board, int color) {
+  int king_index = lsb_index(board->pieces[color][KING]);
+
+  int front_pawn = king_index + (color == WHITE ? 8 : -8);
+  int front_right_pawn = front_pawn + 1;
+  int front_left_pawn = front_pawn - 1;
+  int out = 0;
+  if (board->pieces[color][PAWN] & (1ULL << front_right_pawn)) {
+    out += 1;
+  }
+  if (board->pieces[color][PAWN] & (1ULL << front_left_pawn)) {
+    out += 1;
+  }
+  return out;
+}
+
+static inline void get_mobility(const Board *board, Features *f) {
+  for (ToMove color = WHITE; color <= BLACK; color++) {
+    for (Piece piece = KNIGHT; piece <= QUEEN; piece++) {
+      Bitboard bitboard = board->pieces[color][piece];
+      while (bitboard) {
+        int sq = lsb_index(bitboard);
+        pop_lsb(bitboard);
+
+        Bitboard attacks = generate_attacks(board, piece, sq, color);
+        int mobility = count_set_bits(attacks);
+
+        if (color == WHITE) {
+          f->mobility[MOBILITY_INDEX(piece)] += mobility;
+        } else {
+          f->mobility[MOBILITY_INDEX(piece)] -= mobility;
+        }
+      }
+    }
+  }
+}
+
+Features extract_features(const Board *board) {
+  Features f = {0};
+
+  // Pawn structure
+  for (ToMove color = WHITE; color <= BLACK; color++) {
+    Bitboard pawns = board->pieces[color][PAWN];
+
+    while (pawns) {
+      int sq = lsb_index(pawns);
+      pop_lsb(pawns);
+
+      int file = sq % 8;
+
+      if (!(board->pieces[color][PAWN] & adjacent_files(file))) {
+        // Isolated pawn
+        f.isolated_pawns += COLOR_MULTIPLIER(color);
+      }
+
+      if (board->pieces[color][PAWN] & same_file_ahead(file, sq, color)) {
+        // Doubled pawn
+        f.doubled_pawns += COLOR_MULTIPLIER(color);
+      }
+
+      if (!(board->pieces[OPPOSITE_COLOR(color)][PAWN] &
+            blocking_pawns_mask(file, sq, color))) {
+        // Passed pawn
+        f.passed_pawns += COLOR_MULTIPLIER(color);
+      }
+    }
   }
 
+  // Bishop pair
+  if (count_set_bits(board->pieces[WHITE][BISHOP]) >= 2) {
+    f.bishop_pair += 1;
+  }
+  if (count_set_bits(board->pieces[BLACK][BISHOP]) >= 2) {
+    f.bishop_pair -= 1;
+  }
+
+  // Rooks on open/semi-open files
   for (int color = WHITE; color <= BLACK; color++) {
     Bitboard rooks = board->pieces[color][ROOK];
     while (rooks) {
@@ -455,11 +411,9 @@ static inline Eval misc_eval(Board *board) {
         // semi-open
         if (!(file_mask & board->pieces[OPPOSITE_COLOR(color)][PAWN])) {
           // open
-          score.mg += COLOR_MULTIPLIER(color) * OPEN_ROOK_MG;
-          score.eg += COLOR_MULTIPLIER(color) * OPEN_ROOK_EG;
+          f.rook_open_file += COLOR_MULTIPLIER(color);
         } else {
-          score.mg += COLOR_MULTIPLIER(color) * SEMI_OPEN_ROOK_MG;
-          score.eg += COLOR_MULTIPLIER(color) * SEMI_OPEN_ROOK_EG;
+          f.rook_semi_open_file += COLOR_MULTIPLIER(color);
         }
       }
 
@@ -467,10 +421,32 @@ static inline Eval misc_eval(Board *board) {
     }
   }
 
-  return score;
+  if (is_castled(board, WHITE)) {
+    f.castled += 1;
+  }
+  if (is_castled(board, BLACK)) {
+    f.castled -= 1;
+  }
+
+  if (king_front_pawn(board, WHITE)) {
+    f.king_front_pawns += 1;
+  }
+  if (king_front_pawn(board, BLACK)) {
+    f.king_front_pawns -= 1;
+  }
+
+  f.king_front_side_pawns +=
+      king_side_pawn(board, WHITE) - king_side_pawn(board, BLACK);
+
+  get_mobility(board, &f);
+
+  // TODO: center control
+  f.tempo = (board->to_move == WHITE) ? 1 : -1;
+
+  return f;
 }
 
-int lazy_evaluation(Board *board) {
+int fixed_evaluation(const Board *board) {
   if (board->game_state != GS_ONGOING) {
     switch (board->game_state) {
     case GS_WHITE_WON:
@@ -516,34 +492,30 @@ int lazy_evaluation(Board *board) {
     mgPhase = 24;
   }
   int egPhase = 24 - mgPhase;
-
-  Eval pawn_structure = evaluate_pawn_structure(board);
-  ADD_EVAL(score, pawn_structure);
-
-  Eval mobility = evaluate_mobility(board);
-  ADD_EVAL(score, mobility);
-
-  Eval white_king = evaluate_king(board, WHITE);
-  Eval black_king = evaluate_king(board, BLACK);
-  ADD_EVAL(score, white_king);
-  SUBTRACT_EVAL(score, black_king);
-
-  int tempo_score = (board->to_move == WHITE) ? 10 : -10;
-  Eval misc = misc_eval(board);
-  ADD_EVAL(score, misc);
-
-  int tapered_score = (score.mg * mgPhase + score.eg * egPhase) / 24;
-
-  return tapered_score + tempo_score;
+  int out = (score.mg * mgPhase + score.eg * egPhase) / 24;
+  return out;
 }
 
-bool is_endgame(Board *board) {
-  int queens = count_set_bits(board->pieces[WHITE][QUEEN]) +
-               count_set_bits(board->pieces[BLACK][QUEEN]);
-  int minor_major = 0;
-  for (Piece piece = KNIGHT; piece <= ROOK; piece++) {
-    minor_major += count_set_bits(board->pieces[WHITE][piece]);
-    minor_major += count_set_bits(board->pieces[BLACK][piece]);
+int evaluation(const Board *board, double weights[NUM_FEATURES]) {
+  if (board->game_state != GS_ONGOING) {
+    switch (board->game_state) {
+    case GS_WHITE_WON:
+      return MATE_SCORE;
+    case GS_BLACK_WON:
+      return -MATE_SCORE;
+    case GS_DRAW:
+      return 0;
+    case GS_ONGOING:
+      fprintf(stderr, "unreachable\n");
+      return 0; // shouldn't happen
+    }
   }
-  return (queens == 0) || (queens == 1 && minor_major <= 1);
+
+  int out = fixed_evaluation(board);
+
+  Features features = extract_features(board);
+  double feature_eval = evaluate_features(&features, weights);
+  out += (int)feature_eval;
+
+  return out;
 }

@@ -4,6 +4,7 @@
 #include "fen.h"
 #include "move.h"
 #include "search.h"
+#include "tuning.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -60,6 +61,10 @@ static inline long get_time_ms() { // TODO: remove copy paste
   gettimeofday(&t, NULL);
   return (t.tv_sec * 1000) + (t.tv_usec / 1000);
 }
+
+static double default_weights[NUM_FEATURES] = {
+    -10.0, -8.0, 20.0, 30.0, 15.0, 7.0, 40.0, 10.0,
+    6.0,   5.0,  10.0, 15.0, 20.0, 5.0, 2.0}; // TODO: tune
 
 void go(char *command, char *saveptr, Board *state) {
   int wtime = -1;
@@ -133,7 +138,7 @@ void go(char *command, char *saveptr, Board *state) {
     info.max_duration_ms = 5000; // default to 5 seconds
   }
 
-  search_position(state, &info, &uci_options, book);
+  search_position(state, &info, &uci_options, book, default_weights);
 }
 
 void setoption(char *command, char *saveptr) {

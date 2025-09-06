@@ -32,8 +32,9 @@ static inline long get_time_ms() {
   return (t.tv_sec * 1000) + (t.tv_usec / 1000);
 }
 
-static inline int quiescence(int alpha, int beta, Board *pos) {
-  int static_eval = COLOR_MULTIPLIER(pos->to_move) * lazy_evaluation(pos);
+static inline int quiescence(int alpha, int beta, Board *pos,
+                             double weights[NUM_FEATURES]) {
+  int static_eval = COLOR_MULTIPLIER(pos->to_move) * evaluation(pos, weights);
   int best_value = static_eval;
 
   if (static_eval >= beta) {
@@ -61,7 +62,7 @@ static inline int quiescence(int alpha, int beta, Board *pos) {
       continue;
     }
 
-    int score = -quiescence(-beta, -alpha, pos);
+    int score = -quiescence(-beta, -alpha, pos, weights);
 
     board_unmake_move(pos, move);
 
@@ -80,7 +81,8 @@ static inline int quiescence(int alpha, int beta, Board *pos) {
 
 static inline SearchResults search(Board *pos, int depth, int ply, int alpha,
                                    int beta, SearchInfo *info, bool null_move,
-                                   UCIOptions *options) {
+                                   UCIOptions *options,
+                                   double weights[NUM_FEATURES]) {
 
   ToMove color = pos->to_move;
   SearchResults results = {.score = -INF_SCORE, .best_move = NULL_MOVE};
@@ -105,9 +107,9 @@ static inline SearchResults search(Board *pos, int depth, int ply, int alpha,
   // Check depth
   if (depth == 0 || pos->game_state != GS_ONGOING) {
     if (options->quiescence_search) {
-      results.score = quiescence(alpha, beta, pos);
+      results.score = quiescence(alpha, beta, pos, weights);
     } else {
-      results.score = COLOR_MULTIPLIER(pos->to_move) * lazy_evaluation(pos);
+      results.score = COLOR_MULTIPLIER(pos->to_move) * evaluation(pos, weights);
     }
     results.best_move = NULL_MOVE;
     return results;
@@ -150,8 +152,8 @@ static inline SearchResults search(Board *pos, int depth, int ply, int alpha,
   if (options->null_move_pruning && null_move && depth >= 3 &&
       !king_in_check(pos, color) && !is_endgame(pos)) {
     make_null_move(pos);
-    SearchResults child_res =
-        search(pos, depth - 3, ply + 1, -beta, -beta + 1, info, false, options);
+    SearchResults child_res = search(pos, depth - 3, ply + 1, -beta, -beta + 1,
+                                     info, false, options, weights);
     unmake_null_move(pos);
 
     if (info->stopped)
@@ -193,19 +195,21 @@ static inline SearchResults search(Board *pos, int depth, int ply, int alpha,
       int reduction = 1 + (child_depth / 6); // tune for strength
       child_depth -= reduction;
 
-      SearchResults child_results = search(
-          pos, child_depth, ply + 1, -alpha - 1, -alpha, info, true, options);
+      SearchResults child_results =
+          search(pos, child_depth, ply + 1, -alpha - 1, -alpha, info, true,
+                 options, weights);
       score = -child_results.score;
 
       if (score > alpha && score < beta) {
-        child_results =
-            search(pos, depth - 1, ply + 1, -beta, -alpha, info, true, options);
+        child_results = search(pos, depth - 1, ply + 1, -beta, -alpha, info,
+                               true, options, weights);
         score = -child_results.score;
       }
 
     } else {
       SearchResults child_results =
-          search(pos, child_depth, ply + 1, -beta, -alpha, info, true, options);
+          search(pos, child_depth, ply + 1, -beta, -alpha, info, true, options,
+                 weights);
       score = -child_results.score;
     }
 
@@ -244,7 +248,7 @@ static inline SearchResults search(Board *pos, int depth, int ply, int alpha,
 }
 
 void search_position(Board *board, SearchRequestInfo *info, UCIOptions *options,
-                     FILE *opening_book) {
+                     FILE *opening_book, double weights[NUM_FEATURES]) {
   long end_time_ms = get_time_ms() + info->max_duration_ms;
   SearchInfo search_info = {
       .max_depth = info->max_depth,
@@ -278,7 +282,7 @@ void search_position(Board *board, SearchRequestInfo *info, UCIOptions *options,
     if (search_info.stopped)
       break;
     SearchResults results = search(board, depth, 0, -INF_SCORE, INF_SCORE,
-                                   &search_info, true, options);
+                                   &search_info, true, options, weights);
 
     if (!search_info.stopped || best_move == NULL_MOVE) {
       best_move = results.best_move;

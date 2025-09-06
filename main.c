@@ -1,10 +1,12 @@
 #include "cli.h"
 #include "constants.h"
+#include "data_parse.h"
 #include "debug_printer.h"
 #include "eval.h"
 #include "hash.h"
 #include "misc.h"
 #include "move_test.h"
+#include "tuning.h"
 #include "uci.h"
 
 #include <stdio.h>
@@ -27,6 +29,9 @@ int main(int argc, char **argv) {
           return cli_main();
         } else if (or_strcmp(argv[i + 1], 2, "test", "t")) {
           // do test thing
+        } else if (or_strcmp(argv[i + 1], 2, "tune", "texel")) {
+          texel_tuning();
+          return 0;
         }
       } else {
         printf("Error: --mode requires an argument\n");

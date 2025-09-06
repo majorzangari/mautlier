@@ -2,6 +2,7 @@
 #define MAUTLIER_SEARCH_H
 
 #include "move.h"
+#include "tuning.h"
 #include "uci.h"
 
 // inf might be a misnomer, just a big number to trump other factors
@@ -19,6 +20,6 @@ typedef struct {
 } SearchRequestInfo;
 
 void search_position(Board *board, SearchRequestInfo *info, UCIOptions *options,
-                     FILE *book);
+                     FILE *book, double weights[NUM_FEATURES]);
 
 #endif
